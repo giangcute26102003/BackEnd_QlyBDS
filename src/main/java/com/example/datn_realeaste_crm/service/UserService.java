@@ -26,7 +26,7 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class UserService {
     
-    private final UserRepository userRepository;
+    private final UserRepository userRepository ;
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
     private final DepartmentRepository departmentRepository;
@@ -56,7 +56,11 @@ public class UserService {
         
         return convertToUserResponse(user);
     }
-    
+
+    public UserResponse getUserByEmail(String email) {
+        User user = User.builder().email(email).build();
+        return convertToUserResponse(user);
+    }
     @Transactional
     public UserResponse createUser(UserCreateRequest request) {
         // Check if email already exists
@@ -284,5 +288,6 @@ public class UserService {
         // Revoke all refresh tokens for security
         tokenRepository.revokeAllUserTokens(userId);
     }
+
 
 }

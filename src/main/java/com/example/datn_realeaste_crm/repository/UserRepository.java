@@ -1,6 +1,6 @@
 package com.example.datn_realeaste_crm.repository;
 
-import com.example.datn_realeaste_crm.dto.response.UserResponse;
+
 import com.example.datn_realeaste_crm.entity.*;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;

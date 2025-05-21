@@ -17,19 +17,19 @@ import java.io.IOException;
 @Component
 @RequiredArgsConstructor
 public class JwtTokenFilter extends OncePerRequestFilter {
-    @Autowired
+
     private final JwtTokenProvider tokenProvider;
-    
+
     @Override
-    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain) 
+    protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
-        
+
         try {
             String jwt = resolveToken(request);
-            
+
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
                 // For refresh token requests, we don't set authentication
-                if (!request.getRequestURI().equals("/api/auth/refresh") || !tokenProvider.isRefreshToken(jwt)) {
+                if (!request.getRequestURI().equals("/auth/refresh") && !tokenProvider.isRefreshToken(jwt)) {
                     Authentication authentication = tokenProvider.getAuthentication(jwt);
                     SecurityContextHolder.getContext().setAuthentication(authentication);
                 }
@@ -37,10 +37,10 @@ public class JwtTokenFilter extends OncePerRequestFilter {
         } catch (Exception e) {
             logger.error("Could not set user authentication in security context", e);
         }
-        
+
         filterChain.doFilter(request, response);
     }
-    
+
     private String resolveToken(HttpServletRequest request) {
         String bearerToken = request.getHeader("Authorization");
         if (StringUtils.hasText(bearerToken) && bearerToken.startsWith("Bearer ")) {

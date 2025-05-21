@@ -25,6 +25,8 @@ import java.security.Key;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
@@ -115,16 +117,43 @@ public class JwtTokenProvider {
                 .parseClaimsJws(token)
                 .getBody();
 
-//        Collection<? extends GrantedAuthority> authorities =
-//                Arrays.stream(claims.get("auth").toString().split(","))
-//                        .filter(auth -> !auth.trim().isEmpty())
-//                        .map(SimpleGrantedAuthority::new)
-//                        .collect(Collectors.toList());
-        List<String> roles = claims.get("auth", List.class);
-        Collection<GrantedAuthority> authorities = roles.stream()
-                .map(SimpleGrantedAuthority::new)
-                .collect(Collectors.toList());
+        Collection<GrantedAuthority> authorities = new ArrayList<>();
 
+        // Check if "auth" claim exists
+        if (claims.containsKey("auth")) {
+            Object authClaim = claims.get("auth");
+            log.debug("Auth claim type: {}", authClaim.getClass().getName());
+
+            if (authClaim instanceof List) {
+                List<String> roles = claims.get("auth", List.class);
+                authorities = roles.stream()
+                        .map(SimpleGrantedAuthority::new)
+                        .collect(Collectors.toList());
+            } else if (authClaim instanceof LinkedHashMap || authClaim instanceof Map) {
+                // Handle case where auth is a Map (common with Sets serialized to JSON)
+                Collection<?> values = ((Map<?, ?>) authClaim).values();
+                authorities = values.stream()
+                        .map(Object::toString)
+                        .map(SimpleGrantedAuthority::new)
+                        .collect(Collectors.toList());
+            } else if (authClaim instanceof String) {
+                // Handle case where auth is a comma-separated string
+                authorities = Arrays.stream(authClaim.toString().split(","))
+                        .filter(auth -> !auth.trim().isEmpty())
+                        .map(SimpleGrantedAuthority::new)
+                        .collect(Collectors.toList());
+            } else if (authClaim instanceof Collection) {
+                // Handle case where auth might be a Set or another collection type
+                authorities = ((Collection<?>) authClaim).stream()
+                        .map(Object::toString)
+                        .map(SimpleGrantedAuthority::new)
+                        .collect(Collectors.toList());
+            }
+
+            log.debug("Extracted authorities: {}", authorities);
+        } else {
+            log.warn("No 'auth' claim found in token");
+        }
 
         return new UsernamePasswordAuthenticationToken(claims.getSubject(), "", authorities);
     }
@@ -140,12 +169,12 @@ public class JwtTokenProvider {
 
             return true;
         } catch (io.jsonwebtoken.ExpiredJwtException e) {
-        log.warn("Expired JWT token: {}", e.getMessage());
-        return false;
-    } catch (JwtException | IllegalArgumentException e) {
-        log.error("Invalid JWT token: {}", e.getMessage());
-        return false;
-    }
+            log.warn("Expired JWT token: {}", e.getMessage());
+            return false;
+        } catch (JwtException | IllegalArgumentException e) {
+            log.error("Invalid JWT token: {}", e.getMessage());
+            return false;
+        }
     }
 
     public void revokeToken(String token) {
@@ -164,27 +193,27 @@ public class JwtTokenProvider {
                 .getSubject();
     }
 
-//    public boolean isRefreshToken(String token) {
-//        Claims claims = Jwts.parserBuilder()
-//                .setSigningKey(key)
-//                .build()
-//                .parseClaimsJws(token)
-//                .getBody();
-//
-//        return "refresh".equals(claims.get("type"));
-//    }
-public boolean isRefreshToken(String token) {
-    try {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(key)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
+    // public boolean isRefreshToken(String token) {
+    // Claims claims = Jwts.parserBuilder()
+    // .setSigningKey(key)
+    // .build()
+    // .parseClaimsJws(token)
+    // .getBody();
+    //
+    // return "refresh".equals(claims.get("type"));
+    // }
+    public boolean isRefreshToken(String token) {
+        try {
+            Claims claims = Jwts.parserBuilder()
+                    .setSigningKey(key)
+                    .build()
+                    .parseClaimsJws(token)
+                    .getBody();
 
-        return "refresh".equals(claims.get("type"));
-    } catch (JwtException | IllegalArgumentException e) {
-        log.warn("Invalid or expired JWT while checking refresh token: {}", e.getMessage());
-        return false;
+            return "refresh".equals(claims.get("type"));
+        } catch (JwtException | IllegalArgumentException e) {
+            log.warn("Invalid or expired JWT while checking refresh token: {}", e.getMessage());
+            return false;
+        }
     }
-}
 }
