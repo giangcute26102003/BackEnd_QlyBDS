@@ -7,6 +7,7 @@ import com.example.datn_realeaste_crm.dto.request.RoleAssignmentRequest;
 import com.example.datn_realeaste_crm.dto.request.UserCreateRequest;
 import com.example.datn_realeaste_crm.dto.request.UserUpdateRequest;
 import com.example.datn_realeaste_crm.dto.response.UserResponse;
+import com.example.datn_realeaste_crm.entity.User;
 import com.example.datn_realeaste_crm.service.*;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
@@ -15,6 +16,8 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
@@ -101,5 +104,19 @@ public class UserController {
     public ResponseEntity<Void> removePropertyAccess(@Valid @RequestBody PropertyAccessRequest request) {
         userService.removePropertyAccess(request.getUserId(), request.getPropertyId());
         return ResponseEntity.ok().build();
+    }
+    @PostMapping("/change-password")
+    @Auditable(action = "CHANGE_MYPASSWORD", entityType =  "changpassword")
+    public boolean changepassword(@Valid @RequestBody  String currentPassword, String newPassword){
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        Integer userId = ((User) authentication.getPrincipal()).getUserId();
+        try{
+            userService.changePassword(userId, currentPassword, newPassword);
+
+        }
+        catch (Exception e){
+            throw e;
+        }
+        return true;
     }
 }

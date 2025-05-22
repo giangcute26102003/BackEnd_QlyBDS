@@ -18,6 +18,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -106,9 +107,17 @@ public class PropertyService {
     public PropertyResponse updateProperty(Integer id, PropertyRequest propertyRequest) {
         Property property = propertyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + id));
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null ) {
+            Optional<User> user = userRepository.findByEmail(String.valueOf(authentication.getPrincipal()));
+            Integer UserId = user.get().getUserId();
+            propertyRequest.setUserId(UserId);
+        }
 
         updatePropertyFromRequest(property, propertyRequest);
+
         property.setUpdatedAt(LocalDateTime.now());
+
 
         Property updatedProperty = propertyRepository.save(property);
 

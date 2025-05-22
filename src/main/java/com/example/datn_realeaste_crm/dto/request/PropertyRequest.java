@@ -40,6 +40,5 @@ public class PropertyRequest {
 
     private Integer departmentId;
 
-    @NotNull(message = "User ID is required")
     private Integer userId;
 }

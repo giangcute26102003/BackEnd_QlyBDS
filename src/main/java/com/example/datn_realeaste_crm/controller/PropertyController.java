@@ -48,7 +48,7 @@ public class PropertyController {
     @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(authentication, #id)")
     @Auditable(action = "UPDATE_PROPERTY", entityType = "Property", entityIdParam = "id", logParams = true)
     public ResponseEntity<PropertyResponse> updateProperty(
-            @PathVariable Integer id, 
+            @PathVariable Integer id,
             @Valid @RequestBody PropertyRequest propertyRequest) {
         return ResponseEntity.ok(propertyService.updateProperty(id, propertyRequest));
     }
