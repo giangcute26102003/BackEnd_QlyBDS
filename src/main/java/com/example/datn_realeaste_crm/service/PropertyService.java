@@ -18,7 +18,9 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -28,6 +30,8 @@ public class PropertyService {
     private final DistrictRepository districtRepository;
     private final DepartmentRepository departmentRepository;
     private final UserRepository userRepository;
+    private final PropertyOwnershipRepository propertyOwnershipRepository;
+    private final UserPropertyAccessRepository userPropertyAccessRepository;
 
     public Page<PropertyResponse> getAllProperties(String propertyType, Integer districtId, Integer minPrice,
             Integer maxPrice, Integer bedrooms, Pageable pageable) {
@@ -57,6 +61,70 @@ public class PropertyService {
                 .map(this::convertToPropertyResponse);
     }
 
+    // Method overload to support PropertyController
+    public List<PropertyResponse> getAllProperties() {
+        return propertyRepository.findAll().stream()
+                .map(this::convertToPropertyResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<PropertyResponse> getPropertiesOwnedByCurrentUser() {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            return List.of();
+        }
+
+        List<PropertyOwnership> ownerships = propertyOwnershipRepository
+                .findByUserUserId(currentUser.getUserId());
+
+        return ownerships.stream()
+                .map(ownership -> convertToPropertyResponse(ownership.getProperty()))
+                .collect(Collectors.toList());
+    }
+
+    public List<PropertyResponse> getPropertiesAssignedToCurrentUser() {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            return List.of();
+        }
+
+        List<UserPropertyAccess> accesses = userPropertyAccessRepository
+                .findByUserUserId(currentUser.getUserId());
+
+        return accesses.stream()
+                .map(access -> convertToPropertyResponse(access.getProperty()))
+                .collect(Collectors.toList());
+    }
+
+    public List<PropertyResponse> getPropertiesByDepartment() {
+        User currentUser = getCurrentUser();
+        if (currentUser == null || currentUser.getDepartment() == null) {
+            return List.of();
+        }
+
+        Integer departmentId = currentUser.getDepartment().getDepartmentId();
+        List<Property> properties = propertyRepository.findAll()
+                .stream()
+                .filter(p -> p.getDepartment() != null &&
+                        p.getDepartment().getDepartmentId().equals(departmentId))
+                .collect(Collectors.toList());
+
+        return properties.stream()
+                .map(this::convertToPropertyResponse)
+                .collect(Collectors.toList());
+    }
+
+    public List<PropertyResponse> getPropertiesPendingApproval() {
+        List<Property> pendingProperties = propertyRepository.findAll()
+                .stream()
+                .filter(p -> "PENDING".equals(p.getAvailability()))
+                .collect(Collectors.toList());
+
+        return pendingProperties.stream()
+                .map(this::convertToPropertyResponse)
+                .collect(Collectors.toList());
+    }
+
     public PropertyResponse getProperty(Integer id) {
         Property property = propertyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + id));
@@ -64,34 +132,26 @@ public class PropertyService {
         return convertToPropertyResponse(property);
     }
 
+    // Alias for getProperty to match controller method
+    public PropertyResponse getPropertyById(Integer id) {
+        return getProperty(id);
+    }
+
     @Transactional
     public PropertyResponse createProperty(PropertyRequest propertyRequest) {
         Property property = new Property();
 
-        // Get user from request instead of authentication context
-        User user = null;
-        if (propertyRequest.getUserId() != null) {
-            user = userRepository.findById(propertyRequest.getUserId())
-                    .orElseThrow(() -> new ResourceNotFoundException(
-                            "User not found with id: " + propertyRequest.getUserId()));
-            property.setUser(user);
+        // Always get user from authentication context
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new IllegalStateException("User must be authenticated to create a property");
+        }
 
-            // Set department if user has one and departmentId is not provided
-            if (propertyRequest.getDepartmentId() == null && user.getDepartment() != null) {
-                property.setDepartment(user.getDepartment());
-            }
-        } else {
-            // Fallback to security context if userId not provided
-            Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-            if (authentication != null && authentication.getPrincipal() instanceof User) {
-                User currentUser = (User) authentication.getPrincipal();
-                property.setUser(currentUser);
+        property.setUser(currentUser);
 
-                // Set department if user has one and departmentId is not provided
-                if (propertyRequest.getDepartmentId() == null && currentUser.getDepartment() != null) {
-                    property.setDepartment(currentUser.getDepartment());
-                }
-            }
+        // Set department from user if not provided in request
+        if (propertyRequest.getDepartmentId() == null && currentUser.getDepartment() != null) {
+            property.setDepartment(currentUser.getDepartment());
         }
 
         updatePropertyFromRequest(property, propertyRequest);
@@ -103,25 +163,46 @@ public class PropertyService {
         return convertToPropertyResponse(savedProperty);
     }
 
+    // Method overload to support Object parameter
+    @Transactional
+    public PropertyResponse createProperty(Object propertyDto) {
+        if (propertyDto instanceof PropertyRequest) {
+            return createProperty((PropertyRequest) propertyDto);
+        } else {
+            throw new IllegalArgumentException("Invalid property request format");
+        }
+    }
+
     @Transactional
     public PropertyResponse updateProperty(Integer id, PropertyRequest propertyRequest) {
         Property property = propertyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + id));
-        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-        if (authentication != null ) {
-            Optional<User> user = userRepository.findByEmail(String.valueOf(authentication.getPrincipal()));
-            Integer UserId = user.get().getUserId();
-            propertyRequest.setUserId(UserId);
+
+        // Always get user from authentication context
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new IllegalStateException("User must be authenticated to update a property");
         }
 
+        // Set userId in the request
+        propertyRequest.setUserId(currentUser.getUserId());
+
         updatePropertyFromRequest(property, propertyRequest);
-
         property.setUpdatedAt(LocalDateTime.now());
-
 
         Property updatedProperty = propertyRepository.save(property);
 
         return convertToPropertyResponse(updatedProperty);
+    }
+
+    // Method overload to support Object parameter
+    @Transactional
+    public PropertyResponse updateProperty(Integer id, Object propertyDto) {
+        if (propertyDto instanceof PropertyRequest) {
+            return updateProperty(id, (PropertyRequest) propertyDto);
+        } else {
+            throw new IllegalArgumentException("Invalid property request format");
+        }
     }
 
     @Transactional
@@ -153,6 +234,44 @@ public class PropertyService {
         Property updatedProperty = propertyRepository.save(property);
 
         return convertToPropertyResponse(updatedProperty);
+    }
+
+    // Method overload to support reason parameter
+    @Transactional
+    public PropertyResponse rejectProperty(Integer id, String reason) {
+        Property property = propertyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + id));
+
+        property.setAvailability("REJECTED");
+        property.setDescription(property.getDescription() + "\n[Rejection reason: " + reason + "]");
+        property.setUpdatedAt(LocalDateTime.now());
+
+        Property updatedProperty = propertyRepository.save(property);
+
+        return convertToPropertyResponse(updatedProperty);
+    }
+
+    @Transactional
+    public PropertyResponse assignPropertyToUser(Integer propertyId, Integer userId) {
+        Property property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + propertyId));
+
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        // Check if access already exists
+        Optional<UserPropertyAccess> existingAccess = userPropertyAccessRepository
+                .findByUserUserIdAndPropertyPropertyId(userId, propertyId);
+
+        if (existingAccess.isEmpty()) {
+            UserPropertyAccess access = new UserPropertyAccess();
+            access.setUser(user);
+            access.setProperty(property);
+            // Create a new assign record with basic fields
+            userPropertyAccessRepository.save(access);
+        }
+
+        return convertToPropertyResponse(property);
     }
 
     private void updatePropertyFromRequest(Property property, PropertyRequest request) {
@@ -213,4 +332,21 @@ public class PropertyService {
                 .updatedAt(property.getUpdatedAt())
                 .build();
     }
+
+    private User getCurrentUser() {
+        Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
+        if (authentication != null) {
+            Object principal = authentication.getPrincipal();
+            if (principal instanceof User) {
+                return (User) principal;
+            } else if (principal instanceof String) {
+                // Lấy username từ principal và tìm User tương ứng
+                String username = (String) principal;
+                return userRepository.findByEmail(username)
+                        .orElse(null);
+            }
+        }
+        return null;
+    }
+
 }

@@ -36,7 +36,7 @@ public class NotificationController {
     }
     
     @PostMapping
-    @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_MANAGER')")
+    @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('MANAGER')")
     @Auditable(action = "CREATE_NOTIFICATION", entityType = "Notification", logResult = true)
     public ResponseEntity<NotificationResponse> createNotification(@Valid @RequestBody NotificationRequest request) {
         return new ResponseEntity<>(notificationService.createNotification(request), HttpStatus.CREATED);

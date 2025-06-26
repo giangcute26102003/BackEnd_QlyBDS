@@ -18,6 +18,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.stereotype.Component;
 
 import java.nio.charset.StandardCharsets;
@@ -37,6 +38,8 @@ public class JwtTokenProvider {
 
     private final TokenRepository tokenRepository;
 
+    private final UserDetailsService userDetailsService;
+
     @Value("${jwt.secret}")
     private String secretKey;
 
@@ -47,8 +50,9 @@ public class JwtTokenProvider {
     private long refreshTokenExpiration;
 
     @Autowired
-    public JwtTokenProvider(TokenRepository tokenRepository) {
+    public JwtTokenProvider(TokenRepository tokenRepository, UserDetailsService userDetailsService) {
         this.tokenRepository = tokenRepository;
+        this.userDetailsService = userDetailsService;
     }
 
     @PostConstruct
@@ -117,45 +121,53 @@ public class JwtTokenProvider {
                 .parseClaimsJws(token)
                 .getBody();
 
-        Collection<GrantedAuthority> authorities = new ArrayList<>();
+//        Collection<GrantedAuthority> authorities = new ArrayList<>();
 
         // Check if "auth" claim exists
-        if (claims.containsKey("auth")) {
-            Object authClaim = claims.get("auth");
-            log.debug("Auth claim type: {}", authClaim.getClass().getName());
+//        if (claims.containsKey("auth")) {
+//            Object authClaim = claims.get("auth");
+//            log.debug("Auth claim type: {}", authClaim.getClass().getName());
+//
+//            if (authClaim instanceof List) {
+//                List<String> roles = claims.get("auth", List.class);
+//                authorities = roles.stream()
+//                        .map(SimpleGrantedAuthority::new)
+//                        .collect(Collectors.toList());
+//            } else if (authClaim instanceof LinkedHashMap || authClaim instanceof Map) {
+//                // Handle case where auth is a Map (common with Sets serialized to JSON)
+//                Collection<?> values = ((Map<?, ?>) authClaim).values();
+//                authorities = values.stream()
+//                        .map(Object::toString)
+//                        .map(SimpleGrantedAuthority::new)
+//                        .collect(Collectors.toList());
+//            } else if (authClaim instanceof String) {
+//                // Handle case where auth is a comma-separated string
+//                authorities = Arrays.stream(authClaim.toString().split(","))
+//                        .filter(auth -> !auth.trim().isEmpty())
+//                        .map(SimpleGrantedAuthority::new)
+//                        .collect(Collectors.toList());
+//            } else if (authClaim instanceof Collection) {
+//                // Handle case where auth might be a Set or another collection type
+//                authorities = ((Collection<?>) authClaim).stream()
+//                        .map(Object::toString)
+//                        .map(SimpleGrantedAuthority::new)
+//                        .collect(Collectors.toList());
+//            }
+//
+//            log.debug("Extracted authorities: {}", authorities);
+//        } else {
+//            log.warn("No 'auth' claim found in token");
+//        }
+//
+//        return new UsernamePasswordAuthenticationToken(claims.getSubject(), "", authorities);
+        String email = claims.getSubject();
 
-            if (authClaim instanceof List) {
-                List<String> roles = claims.get("auth", List.class);
-                authorities = roles.stream()
-                        .map(SimpleGrantedAuthority::new)
-                        .collect(Collectors.toList());
-            } else if (authClaim instanceof LinkedHashMap || authClaim instanceof Map) {
-                // Handle case where auth is a Map (common with Sets serialized to JSON)
-                Collection<?> values = ((Map<?, ?>) authClaim).values();
-                authorities = values.stream()
-                        .map(Object::toString)
-                        .map(SimpleGrantedAuthority::new)
-                        .collect(Collectors.toList());
-            } else if (authClaim instanceof String) {
-                // Handle case where auth is a comma-separated string
-                authorities = Arrays.stream(authClaim.toString().split(","))
-                        .filter(auth -> !auth.trim().isEmpty())
-                        .map(SimpleGrantedAuthority::new)
-                        .collect(Collectors.toList());
-            } else if (authClaim instanceof Collection) {
-                // Handle case where auth might be a Set or another collection type
-                authorities = ((Collection<?>) authClaim).stream()
-                        .map(Object::toString)
-                        .map(SimpleGrantedAuthority::new)
-                        .collect(Collectors.toList());
-            }
+        // Load user details from DB
+        UserDetails userDetails = userDetailsService.loadUserByUsername(email);
 
-            log.debug("Extracted authorities: {}", authorities);
-        } else {
-            log.warn("No 'auth' claim found in token");
-        }
+        Collection<GrantedAuthority> authorities = extractAuthorities(claims);
 
-        return new UsernamePasswordAuthenticationToken(claims.getSubject(), "", authorities);
+        return new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
     }
 
     public boolean validateToken(String token) {
@@ -215,5 +227,17 @@ public class JwtTokenProvider {
             log.warn("Invalid or expired JWT while checking refresh token: {}", e.getMessage());
             return false;
         }
+    }
+
+    private Collection<GrantedAuthority> extractAuthorities(Claims claims) {
+        Object authClaim = claims.get("auth");
+        if (authClaim instanceof Collection<?>) {
+            return ((Collection<?>) authClaim).stream()
+                    .map(Object::toString)
+                    .map(SimpleGrantedAuthority::new)
+                    .collect(Collectors.toList());
+        }
+        return Collections.emptyList();
+
     }
 }

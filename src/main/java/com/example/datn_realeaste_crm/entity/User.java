@@ -71,7 +71,7 @@ public class User implements UserDetails {
         
         // Add role-based authorities
         for (UserRole userRole : userRoles) {
-            authorities.add(new SimpleGrantedAuthority("ROLE_" + userRole.getRole().getRoleName()));
+            authorities.add(new SimpleGrantedAuthority( userRole.getRole().getRoleName()));
             
             // Add all permissions for this role
             authorities.addAll(userRole.getRole().getRolePermissions().stream()

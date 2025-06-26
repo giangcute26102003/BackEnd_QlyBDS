@@ -25,35 +25,35 @@ public class DepartmentController {
     private final DepartmentService departmentService;
     
     @GetMapping
-    @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_MANAGER')")
+    @PreAuthorize("hasAuthority('ADMIN') or hasAuthority('MANAGER')")
     public ResponseEntity<Page<DepartmentResponse>> getAllDepartments(Pageable pageable) {
         return ResponseEntity.ok(departmentService.getAllDepartments(pageable));
     }
     
     @GetMapping("/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_MANAGER')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public ResponseEntity<DepartmentResponse> getDepartment(@PathVariable Integer id) {
         return ResponseEntity.ok(departmentService.getDepartment(id));
     }
     
     @PostMapping
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Auditable(action = "CREATE_DEPARTMENT", entityType = "Department", logResult = true)
     public ResponseEntity<DepartmentResponse> createDepartment(@Valid @RequestBody DepartmentRequest request) {
         return new ResponseEntity<>(departmentService.createDepartment(request), HttpStatus.CREATED);
     }
     
     @PutMapping("/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Auditable(action = "UPDATE_DEPARTMENT", entityType = "Department", entityIdParam = "id")
     public ResponseEntity<DepartmentResponse> updateDepartment(
             @PathVariable Integer id, 
             @Valid @RequestBody DepartmentRequest request) {
         return ResponseEntity.ok(departmentService.updateDepartment(id, request));
     }
-    
+
     @DeleteMapping("/{id}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Auditable(action = "DELETE_DEPARTMENT", entityType = "Department", entityIdParam = "id")
     public ResponseEntity<Void> deleteDepartment(@PathVariable Integer id) {
         departmentService.deleteDepartment(id);
@@ -61,7 +61,7 @@ public class DepartmentController {
     }
     
     @PutMapping("/{id}/manager/{userId}")
-    @PreAuthorize("hasRole('ROLE_ADMIN')")
+    @PreAuthorize("hasRole('ADMIN')")
     @Auditable(action = "ASSIGN_DEPARTMENT_MANAGER", entityType = "Department", entityIdParam = "id")
     public ResponseEntity<DepartmentResponse> assignManager(
             @PathVariable Integer id, 
@@ -70,7 +70,7 @@ public class DepartmentController {
     }
     
     @GetMapping("/{id}/users")
-    @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_MANAGER')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public ResponseEntity<List<UserResponse>> getDepartmentUsers(@PathVariable Integer id) {
         return ResponseEntity.ok(departmentService.getDepartmentUsers(id));
     }

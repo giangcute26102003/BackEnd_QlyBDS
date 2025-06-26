@@ -1,6 +1,5 @@
 package com.example.datn_realeaste_crm.service;
 
-
 import com.example.datn_realeaste_crm.dto.request.*;
 import com.example.datn_realeaste_crm.dto.response.*;
 import com.example.datn_realeaste_crm.entity.*;
@@ -18,6 +17,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -25,8 +25,8 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class UserService {
-    
-    private final UserRepository userRepository ;
+
+    private final UserRepository userRepository;
     private final RoleRepository roleRepository;
     private final UserRoleRepository userRoleRepository;
     private final DepartmentRepository departmentRepository;
@@ -34,26 +34,26 @@ public class UserService {
     private final UserPropertyAccessRepository userPropertyAccessRepository;
     private final PasswordEncoder passwordEncoder;
     private final TokenRepository tokenRepository;
-    
+
     public Page<UserResponse> getAllUsers(Integer departmentId, Boolean isActive, Pageable pageable) {
         Specification<User> spec = Specification.where(null);
-        
+
         if (departmentId != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("department").get("departmentId"), departmentId));
         }
-        
+
         if (isActive != null) {
             spec = spec.and((root, query, cb) -> cb.equal(root.get("isActive"), isActive));
         }
-        
+
         return userRepository.findAll(spec, pageable)
                 .map(this::convertToUserResponse);
     }
-    
+
     public UserResponse getUserById(Integer id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
-        
+
         return convertToUserResponse(user);
     }
 
@@ -61,6 +61,7 @@ public class UserService {
         User user = User.builder().email(email).build();
         return convertToUserResponse(user);
     }
+
     @Transactional
     public UserResponse createUser(UserCreateRequest request) {
         // Check if email already exists
@@ -80,7 +81,8 @@ public class UserService {
         // Set department if provided
         if (request.getDepartmentId() != null) {
             Department department = departmentRepository.findById(request.getDepartmentId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Department not found with id: " + request.getDepartmentId()));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Department not found with id: " + request.getDepartmentId()));
             user.setDepartment(department);
         }
 
@@ -106,154 +108,155 @@ public class UserService {
     public UserResponse updateUser(Integer id, UserUpdateRequest request) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
-        
+
         // Check if new email is already used by another user
         if (request.getEmail() != null && !request.getEmail().equals(user.getEmail()) &&
                 userRepository.existsByEmail(request.getEmail())) {
             throw new ResourceAlreadyExistsException("Email already in use: " + request.getEmail());
         }
-        
+
         if (request.getName() != null) {
             user.setName(request.getName());
         }
-        
+
         if (request.getEmail() != null) {
             user.setEmail(request.getEmail());
         }
-        
+
         if (request.getPassword() != null) {
             user.setPassword(passwordEncoder.encode(request.getPassword()));
         }
-        
+
         if (request.getPhoneNumber() != null) {
             user.setPhoneNumber(request.getPhoneNumber());
         }
-        
+
         if (request.getAddress() != null) {
             user.setAddress(request.getAddress());
         }
-        
+
         if (request.getDob() != null) {
             user.setDob(request.getDob());
         }
-        
+
         if (request.getDepartmentId() != null) {
             Department department = departmentRepository.findById(request.getDepartmentId())
-                    .orElseThrow(() -> new ResourceNotFoundException("Department not found with id: " + request.getDepartmentId()));
+                    .orElseThrow(() -> new ResourceNotFoundException(
+                            "Department not found with id: " + request.getDepartmentId()));
             user.setDepartment(department);
         }
-        
+
         user.setUpdatedAt(LocalDateTime.now());
         User updatedUser = userRepository.save(user);
-        
+
         return convertToUserResponse(updatedUser);
     }
-    
+
     @Transactional
     public UserResponse deactivateUser(Integer id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
-        
+
         user.setIsActive(false);
         user.setUpdatedAt(LocalDateTime.now());
-        
+
         User updatedUser = userRepository.save(user);
         return convertToUserResponse(updatedUser);
     }
-    
+
     @Transactional
     public UserResponse activateUser(Integer id) {
         User user = userRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
-        
+
         user.setIsActive(true);
         user.setUpdatedAt(LocalDateTime.now());
-        
+
         User updatedUser = userRepository.save(user);
         return convertToUserResponse(updatedUser);
     }
-    
+
     @Transactional
     public UserResponse assignRole(Integer userId, Integer roleId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-        
+
         Role role = roleRepository.findById(roleId)
                 .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + roleId));
-        
+
         // Check if the user already has this role
         Optional<UserRole> existingRole = user.getUserRoles().stream()
                 .filter(ur -> ur.getRole().getRoleId().equals(roleId))
                 .findFirst();
-        
+
         if (existingRole.isEmpty()) {
             UserRole userRole = new UserRole();
             userRole.setUser(user);
             userRole.setRole(role);
             userRole.setAssignedAt(LocalDateTime.now());
-            
+
             userRoleRepository.save(userRole);
         }
-        
+
         return convertToUserResponse(user);
     }
-    
+
     @Transactional
     public UserResponse removeRole(Integer userId, Integer roleId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-        
+
         // Find the user role to remove
         UserRole userRoleToRemove = user.getUserRoles().stream()
                 .filter(ur -> ur.getRole().getRoleId().equals(roleId))
                 .findFirst()
                 .orElseThrow(() -> new ResourceNotFoundException("User does not have role with id: " + roleId));
-        
+
         userRoleRepository.delete(userRoleToRemove);
-        
+
         // Refresh the user
         user = userRepository.findById(userId).orElseThrow();
-        
+
         return convertToUserResponse(user);
     }
-    
+
     @Transactional
     public void assignPropertyAccess(Integer userId, Integer propertyId) {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
-        
+
         Property property = propertyRepository.findById(propertyId)
                 .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + propertyId));
-        
+
         // Check if access already exists
         if (!userPropertyAccessRepository.existsByUserUserIdAndPropertyPropertyId(userId, propertyId)) {
             UserPropertyAccess access = new UserPropertyAccess();
             access.setUser(user);
             access.setProperty(property);
             access.setAccessGrantedAt(LocalDateTime.now());
-            
+
             userPropertyAccessRepository.save(access);
         }
     }
-    
+
     @Transactional
     public void removePropertyAccess(Integer userId, Integer propertyId) {
         if (!userRepository.existsById(userId)) {
             throw new ResourceNotFoundException("User not found with id: " + userId);
         }
-        
+
         if (!propertyRepository.existsById(propertyId)) {
             throw new ResourceNotFoundException("Property not found with id: " + propertyId);
         }
-        
+
         userPropertyAccessRepository.deleteByUserUserIdAndPropertyPropertyId(userId, propertyId);
     }
-    
+
     private UserResponse convertToUserResponse(User user) {
         Set<String> roles = user.getUserRoles().stream()
                 .map(userRole -> userRole.getRole().getRoleName())
                 .collect(Collectors.toSet());
-        
+
         return UserResponse.builder()
                 .id(user.getUserId())
                 .name(user.getName())
@@ -269,6 +272,7 @@ public class UserService {
                 .updatedAt(user.getUpdatedAt())
                 .build();
     }
+
     @Transactional
     public void changePassword(Integer userId, String currentPassword, String newPassword) {
         User user = userRepository.findById(userId)
@@ -289,5 +293,20 @@ public class UserService {
         tokenRepository.revokeAllUserTokens(userId);
     }
 
+    @Transactional
+    public List<RoleResponse> getUserRoles(Integer userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        return user.getUserRoles().stream()
+                .map(userRole -> RoleResponse.builder()
+                        .roleId(userRole.getRole().getRoleId())
+                        .roleName(userRole.getRole().getRoleName())
+                        .description(userRole.getRole().getDescription())
+                        .createdAt(userRole.getRole().getCreatedAt())
+                        .updatedAt(userRole.getRole().getUpdatedAt())
+                        .build())
+                .collect(Collectors.toList());
+    }
 
 }

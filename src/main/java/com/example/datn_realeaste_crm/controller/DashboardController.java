@@ -22,7 +22,7 @@ public class DashboardController {
     private final DashboardService dashboardService;
     
     @GetMapping("/statistics")
-    @PreAuthorize("hasRole('ROLE_ADMIN') or hasRole('ROLE_MANAGER')")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     public ResponseEntity<DashboardStatisticsResponse> getStatistics() {
         return ResponseEntity.ok(dashboardService.getStatistics());
     }

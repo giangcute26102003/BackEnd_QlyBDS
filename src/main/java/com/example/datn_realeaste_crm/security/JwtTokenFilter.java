@@ -5,7 +5,6 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.stereotype.Component;
@@ -28,10 +27,13 @@ public class JwtTokenFilter extends OncePerRequestFilter {
             String jwt = resolveToken(request);
 
             if (StringUtils.hasText(jwt) && tokenProvider.validateToken(jwt)) {
-                // For refresh token requests, we don't set authentication
+                logger.info("JWT is valid: " + jwt);
                 if (!request.getRequestURI().equals("/auth/refresh") && !tokenProvider.isRefreshToken(jwt)) {
                     Authentication authentication = tokenProvider.getAuthentication(jwt);
+                    logger.info("Authentication from token: " + authentication);
                     SecurityContextHolder.getContext().setAuthentication(authentication);
+                    logger.info("Current authentication in context: "
+                            + SecurityContextHolder.getContext().getAuthentication());
                 }
             }
         } catch (Exception e) {
