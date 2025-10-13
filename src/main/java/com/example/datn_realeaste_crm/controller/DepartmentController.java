@@ -25,7 +25,7 @@ public class DepartmentController {
     private final DepartmentService departmentService;
     
     @GetMapping
-    @PreAuthorize("hasAuthority('ADMIN') or hasAuthority('MANAGER')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Page<DepartmentResponse>> getAllDepartments(Pageable pageable) {
         return ResponseEntity.ok(departmentService.getAllDepartments(pageable));
     }

@@ -6,13 +6,13 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "user_property_access")
+@Table(name = "user_district_access")
 @Getter
 @Setter
 @AllArgsConstructor
 @NoArgsConstructor
 @Builder
-public class UserPropertyAccess {
+public class UserDistrictAccess {
     
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -24,8 +24,8 @@ public class UserPropertyAccess {
     private User user;
     
     @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "property_id", nullable = false)
-    private Property property;
+    @JoinColumn(name = "district_id", nullable = false)
+    private District district;
     
     @Column(name = "access_granted_at")
     private LocalDateTime accessGrantedAt;

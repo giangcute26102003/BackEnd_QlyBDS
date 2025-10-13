@@ -1,0 +1,202 @@
+@startuml Notification System Use Case
+!theme plain
+skinparam actorStyle awesome
+skinparam usecase {
+    BackgroundColor #E8F4FD
+    BorderColor #2E86AB
+    ArrowColor #2E86AB
+}
+
+title Luồng Hệ Thống Thông Báo - Use Case Chi Tiết
+
+' Actors
+actor "Admin" as admin
+actor "Manager" as manager
+actor "User" as user
+actor "System" as system
+actor "Email Service" as emailService
+actor "WebSocket" as websocket
+
+' Use Cases
+usecase "Quản lý thông báo" as manageNotification
+usecase "Tạo thông báo" as createNotification
+usecase "Nhập nội dung thông báo" as inputNotificationContent
+usecase "Chọn loại thông báo" as selectNotificationType
+usecase "Chọn người nhận" as selectRecipients
+usecase "Lưu thông báo" as saveNotification
+usecase "Gửi thông báo" as sendNotification
+usecase "Gửi qua email" as sendEmail
+usecase "Gửi qua WebSocket" as sendWebSocket
+ususc "Gửi qua push notification" as sendPushNotification
+usecase "Gửi qua SMS" as sendSMS
+usecase "Đánh dấu đã đọc" as markAsRead
+usecase "Đánh dấu tất cả đã đọc" as markAllAsRead
+usecase "Xóa thông báo" as deleteNotification
+usecase "Lưu trữ thông báo" as archiveNotification
+usecase "Xem danh sách thông báo" as viewNotificationList
+usecase "Lọc thông báo" as filterNotification
+usecase "Sắp xếp thông báo" as sortNotification
+usecase "Phân trang thông báo" as paginateNotification
+usecase "Xem thông báo chi tiết" as viewNotificationDetail
+usecase "Tìm kiếm thông báo" as searchNotification
+usecase "Tạo template thông báo" as createTemplate
+usecase "Sửa template thông báo" as editTemplate
+usecase "Xóa template thông báo" as deleteTemplate
+usecase "Sử dụng template" as useTemplate
+usecase "Lập lịch gửi thông báo" as scheduleNotification
+usecase "Gửi thông báo định kỳ" as sendPeriodicNotification
+usecase "Gửi thông báo theo sự kiện" as sendEventNotification
+usecase "Gửi thông báo theo điều kiện" as sendConditionalNotification
+usecase "Kiểm tra điều kiện gửi" as checkSendingCondition
+usecase "Xác thực người nhận" as validateRecipient
+usecase "Kiểm tra quyền gửi" as checkSendingPermission
+usecase "Ghi log hoạt động" as logActivity
+usecase "Tạo báo cáo thông báo" as generateNotificationReport
+usecase "Theo dõi trạng thái gửi" as trackSendingStatus
+usecase "Xử lý lỗi gửi" as handleSendingError
+usecase "Gửi lại thông báo" as resendNotification
+usecase "Hủy thông báo" as cancelNotification
+usecase "Tùy chỉnh cài đặt thông báo" as customizeNotificationSettings
+usecase "Bật/tắt loại thông báo" as toggleNotificationType
+usecase "Thiết lập thời gian nhận" as setNotificationTime
+usecase "Lưu cài đặt" as saveSettings
+
+' Relationships
+admin --> createNotification
+admin --> createTemplate
+admin --> scheduleNotification
+admin --> generateNotificationReport
+
+manager --> createNotification
+manager --> createTemplate
+manager --> scheduleNotification
+manager --> generateNotificationReport
+
+user --> manageNotification
+user --> viewNotificationList
+user --> markAsRead
+user --> markAllAsRead
+user --> deleteNotification
+user --> customizeNotificationSettings
+
+createNotification --> inputNotificationContent
+createNotification --> selectNotificationType
+createNotification --> selectRecipients
+createNotification --> saveNotification
+createNotification --> sendNotification
+
+inputNotificationContent --> system
+selectNotificationType --> system
+selectRecipients --> validateRecipient
+validateRecipient --> system
+saveNotification --> system
+
+sendNotification --> checkSendingPermission
+checkSendingPermission --> system
+sendNotification --> sendEmail
+sendNotification --> sendWebSocket
+sendNotification --> sendPushNotification
+sendNotification --> sendSMS
+
+sendEmail --> emailService
+sendWebSocket --> websocket
+sendPushNotification --> system
+sendSMS --> system
+
+markAsRead --> system
+markAllAsRead --> system
+deleteNotification --> system
+archiveNotification --> system
+
+viewNotificationList --> filterNotification
+viewNotificationList --> sortNotification
+viewNotificationList --> paginateNotification
+filterNotification --> system
+sortNotification --> system
+paginateNotification --> system
+
+viewNotificationDetail --> system
+
+searchNotification --> system
+
+createTemplate --> system
+editTemplate --> system
+deleteTemplate --> system
+useTemplate --> system
+
+scheduleNotification --> system
+sendPeriodicNotification --> system
+sendEventNotification --> system
+sendConditionalNotification --> checkSendingCondition
+checkSendingCondition --> system
+
+trackSendingStatus --> system
+handleSendingError --> resendNotification
+resendNotification --> system
+cancelNotification --> system
+
+customizeNotificationSettings --> toggleNotificationType
+customizeNotificationSettings --> setNotificationTime
+customizeNotificationSettings --> saveSettings
+toggleNotificationType --> system
+setNotificationTime --> system
+saveSettings --> system
+
+generateNotificationReport --> system
+
+' Include relationships
+createNotification ..> validateRecipient : <<include>>
+createNotification ..> checkSendingPermission : <<include>>
+sendNotification ..> trackSendingStatus : <<include>>
+sendNotification ..> logActivity : <<include>>
+
+markAsRead ..> logActivity : <<include>>
+markAllAsRead ..> logActivity : <<include>>
+deleteNotification ..> logActivity : <<include>>
+
+createTemplate ..> logActivity : <<include>>
+editTemplate ..> logActivity : <<include>>
+deleteTemplate ..> logActivity : <<include>>
+
+scheduleNotification ..> logActivity : <<include>>
+sendEventNotification ..> logActivity : <<include>>
+sendConditionalNotification ..> logActivity : <<include>>
+
+customizeNotificationSettings ..> saveSettings : <<include>>
+
+' Extend relationships
+viewNotificationList <.. filterNotification : <<extend>>
+viewNotificationList <.. sortNotification : <<extend>>
+viewNotificationList <.. paginateNotification : <<extend>>
+
+sendNotification <.. sendEmail : <<extend>>
+sendNotification <.. sendWebSocket : <<extend>>
+sendNotification <.. sendPushNotification : <<extend>>
+sendNotification <.. sendSMS : <<extend>>
+
+sendConditionalNotification <.. checkSendingCondition : <<extend>>
+
+customizeNotificationSettings <.. toggleNotificationType : <<extend>>
+customizeNotificationSettings <.. setNotificationTime : <<extend>>
+
+@enduml
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

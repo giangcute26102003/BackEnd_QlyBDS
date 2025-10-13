@@ -1,6 +1,8 @@
 package com.example.datn_realeaste_crm.security;
 
 import com.example.datn_realeaste_crm.dto.response.*;
+import com.example.datn_realeaste_crm.entity.AvailabilityStatus;
+import com.example.datn_realeaste_crm.entity.Notification;
 import com.example.datn_realeaste_crm.entity.User;
 import com.example.datn_realeaste_crm.exception.ResourceNotFoundException;
 import com.example.datn_realeaste_crm.repository.*;
@@ -23,9 +25,9 @@ public class DashboardService {
 
     public DashboardStatisticsResponse getStatistics() {
         long totalProperties = propertyRepository.count();
-        long pendingProperties = propertyRepository.countByAvailability("PENDING");
-        long approvedProperties = propertyRepository.countByAvailability("APPROVED");
-        long rejectedProperties = propertyRepository.countByAvailability("REJECTED");
+        long pendingProperties = propertyRepository.countByAvailability(AvailabilityStatus.PENDING);
+        long approvedProperties = propertyRepository.countByAvailability(AvailabilityStatus.AVAILABLE);
+        long rejectedProperties = propertyRepository.countByAvailability(AvailabilityStatus.NOT_AVAILABLE);
 
         long totalUsers = userRepository.count();
         long activeUsers = userRepository.countByIsActiveTrue();
@@ -53,12 +55,12 @@ public class DashboardService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
         long myProperties = propertyRepository.countByUserUserId(userId);
-        long myApprovedProperties = propertyRepository.countByUserUserIdAndAvailability(userId, "APPROVED");
-        long myPendingProperties = propertyRepository.countByUserUserIdAndAvailability(userId, "PENDING");
+        long myApprovedProperties = propertyRepository.countByUserUserIdAndAvailability(userId, AvailabilityStatus.AVAILABLE);
+        long myPendingProperties = propertyRepository.countByUserUserIdAndAvailability(userId, AvailabilityStatus.PENDING);
 
         long myFavorites = favoriteRepository.countByUserUserId(userId);
         long myReviews = reviewRepository.countByUserUserId(userId);
-        long unreadNotifications = notificationRepository.countByUserUserIdAndStatus(userId, "Chưa đọc");
+        long unreadNotifications = notificationRepository.countByUserUserIdAndStatus(userId, Notification.NotificationStatus.CHUA_DOC);
 
         return UserStatisticsResponse.builder()
                 .myProperties(myProperties)

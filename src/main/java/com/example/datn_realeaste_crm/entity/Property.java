@@ -56,8 +56,9 @@ public class Property {
     @Column(name = "legal_documents", columnDefinition = "TEXT")
     private String legalDocuments;
     
-    @Column(name = "availability")
-    private String availability;
+    @Enumerated(EnumType.ORDINAL)
+    @Column(name = "availability", nullable = false)
+    private AvailabilityStatus availability;
     
     @Column(name = "phone_owner")
     private String phoneOwner;

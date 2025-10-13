@@ -138,7 +138,7 @@ public class DepartmentService {
     
     private UserResponse convertToUserResponse(User user) {
         return UserResponse.builder()
-                .id(user.getUserId())
+                .userId(user.getUserId())
                 .name(user.getName())
                 .email(user.getEmail())
                 .phoneNumber(user.getPhoneNumber())

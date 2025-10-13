@@ -8,9 +8,11 @@ import com.example.datn_realeaste_crm.service.PropertyImageService;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
 
@@ -26,13 +28,22 @@ public class PropertyImageController {
         return ResponseEntity.ok(propertyImageService.getPropertyImages(propertyId));
     }
     
-    @PostMapping
+    @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(authentication, #propertyId)")
     @Auditable(action = "ADD_PROPERTY_IMAGE", entityType = "PropertyImage", logResult = true)
     public ResponseEntity<PropertyImageResponse> addPropertyImage(
             @PathVariable Integer propertyId,
+            @RequestParam("file") MultipartFile file) {
+        return new ResponseEntity<>(propertyImageService.addPropertyImage(propertyId, file), HttpStatus.CREATED);
+    }
+    
+    @PostMapping("/url")
+    @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(authentication, #propertyId)")
+    @Auditable(action = "ADD_PROPERTY_IMAGE_URL", entityType = "PropertyImage", logResult = true)
+    public ResponseEntity<PropertyImageResponse> addPropertyImageByUrl(
+            @PathVariable Integer propertyId,
             @Valid @RequestBody PropertyImageRequest request) {
-        return new ResponseEntity<>(propertyImageService.addPropertyImage(propertyId, request), HttpStatus.CREATED);
+        return new ResponseEntity<>(propertyImageService.addPropertyImageByUrl(propertyId, request), HttpStatus.CREATED);
     }
     
     @DeleteMapping("/{imageId}")
@@ -45,13 +56,23 @@ public class PropertyImageController {
         return ResponseEntity.ok().build();
     }
     
-    @PutMapping("/{imageId}")
+    @PutMapping(value = "/{imageId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(authentication, #propertyId)")
     @Auditable(action = "UPDATE_PROPERTY_IMAGE", entityType = "PropertyImage", entityIdParam = "imageId")
     public ResponseEntity<PropertyImageResponse> updatePropertyImage(
             @PathVariable Integer propertyId,
             @PathVariable Integer imageId,
+            @RequestParam("file") MultipartFile file) {
+        return ResponseEntity.ok(propertyImageService.updatePropertyImage(propertyId, imageId, file));
+    }
+    
+    @PutMapping("/{imageId}/url")
+    @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(authentication, #propertyId)")
+    @Auditable(action = "UPDATE_PROPERTY_IMAGE_URL", entityType = "PropertyImage", entityIdParam = "imageId")
+    public ResponseEntity<PropertyImageResponse> updatePropertyImageByUrl(
+            @PathVariable Integer propertyId,
+            @PathVariable Integer imageId,
             @Valid @RequestBody PropertyImageRequest request) {
-        return ResponseEntity.ok(propertyImageService.updatePropertyImage(propertyId, imageId, request));
+        return ResponseEntity.ok(propertyImageService.updatePropertyImageByUrl(propertyId, imageId, request));
     }
 }

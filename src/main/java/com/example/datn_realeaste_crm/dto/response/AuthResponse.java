@@ -11,6 +11,7 @@ public class AuthResponse {
     private Integer userId;
     private String email;
     private String name;
+    private String selectedRole;
     
     @JsonProperty("access_token")
     private String accessToken;

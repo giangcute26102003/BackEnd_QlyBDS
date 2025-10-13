@@ -12,7 +12,7 @@ import java.util.Set;
 @Builder
 public class UserResponse {
     
-    private Integer id;
+    private Integer userId;
     private String name;
     private String email;
     private String phoneNumber;

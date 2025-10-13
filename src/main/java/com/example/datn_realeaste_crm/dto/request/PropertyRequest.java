@@ -1,5 +1,6 @@
 package com.example.datn_realeaste_crm.dto.request;
 
+import com.example.datn_realeaste_crm.entity.AvailabilityStatus;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.NotNull;
 import jakarta.validation.constraints.Size;
@@ -41,4 +42,6 @@ public class PropertyRequest {
     private Integer departmentId;
 
     private Integer userId;
+
+    private AvailabilityStatus availability;
 }

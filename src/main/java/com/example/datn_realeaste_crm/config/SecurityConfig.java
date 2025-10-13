@@ -32,6 +32,7 @@ public class SecurityConfig {
 
     private final CustomUserDetailsService userDetailsService;
     private final JwtTokenFilter jwtTokenFilter;
+    private final AppCheckFilter appCheckFilter;
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
@@ -42,16 +43,16 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         // Public endpoints
                         .requestMatchers("/auth/**").permitAll()
-                        .requestMatchers("/swagger-ui/**", "/v3/api-docs/**").permitAll()
+                        .requestMatchers("/swagger-ui/**", "/swagger-ui.html", "/v3/api-docs/**", "/api-docs/**", "/webjars/**").permitAll()
                         .requestMatchers(HttpMethod.GET, "/properties/**").permitAll()
 
                         // Admin access - full system access
                         .requestMatchers("/admin/**").hasRole(RoleEnum.ADMIN.name())
-                        .requestMatchers("/users/**").hasAnyRole(RoleEnum.ADMIN.name(), RoleEnum.MANAGER.name())
+//                        .requestMatchers("/users/**").hasAnyRole(RoleEnum.ADMIN.name(), RoleEnum.MANAGER.name())
                         .requestMatchers(HttpMethod.POST, "/users").hasRole(RoleEnum.ADMIN.name())
                         .requestMatchers(HttpMethod.DELETE, "/users/**").hasRole(RoleEnum.ADMIN.name())
                         .requestMatchers("/users/{id}/roles").hasRole(RoleEnum.ADMIN.name())
-                        .requestMatchers("/departments/**").hasAnyAuthority(RoleEnum.ADMIN.name(), RoleEnum.MANAGER.name())
+                        .requestMatchers("/departments/**").hasRole(RoleEnum.ADMIN.name())
                         .requestMatchers("/audit-logs/**").hasRole(RoleEnum.ADMIN.name())
                         .requestMatchers("/system-config/**").hasRole(RoleEnum.ADMIN.name())
 
@@ -95,6 +96,7 @@ public class SecurityConfig {
                         // Default - authenticated
                         .anyRequest().authenticated())
                 .authenticationProvider(authenticationProvider())
+                .addFilterBefore(appCheckFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtTokenFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
@@ -123,7 +125,7 @@ public class SecurityConfig {
         CorsConfiguration configuration = new CorsConfiguration();
         configuration.setAllowedOrigins(Arrays.asList("*"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
-        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type"));
+        configuration.setAllowedHeaders(Arrays.asList("Authorization", "Content-Type", "X-Firebase-AppCheck"));
         configuration.setExposedHeaders(Arrays.asList("Authorization"));
         configuration.setAllowCredentials(false);
         configuration.setMaxAge(3600L);

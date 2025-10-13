@@ -16,6 +16,8 @@ public class CustomerResponse {
     private String phoneNumber;
     private String email;
     private String address;
+    private Integer userId;
+    private String userName;
     
     @JsonFormat(pattern = "yyyy-MM-dd")
     private LocalDate dob;

@@ -1,11 +1,13 @@
 package com.example.datn_realeaste_crm.dto.response;
 
+import com.example.datn_realeaste_crm.entity.AvailabilityStatus;
 import com.fasterxml.jackson.annotation.JsonFormat;
 import lombok.Builder;
 import lombok.Data;
 
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Data
 @Builder
@@ -22,7 +24,8 @@ public class PropertyResponse {
     private String description;
     private BigDecimal price;
     private String legalDocuments;
-    private String availability;
+    private AvailabilityStatus availability;
+    private String availabilityText;
     private String phoneOwner;
     private Integer districtId;
     private String districtName;
@@ -30,6 +33,7 @@ public class PropertyResponse {
     private String departmentName;
     private Integer userId;
     private String userName;
+    private List<PropertyImageResponse> images;
     
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;

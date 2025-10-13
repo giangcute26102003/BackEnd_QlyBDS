@@ -30,7 +30,9 @@ public class NotificationService {
         
         Page<Notification> notifications;
         if (status != null) {
-            notifications = notificationRepository.findByUserUserIdAndStatus(userId, status, pageable);
+            // Convert string status to enum
+            Notification.NotificationStatus notificationStatus = Notification.NotificationStatus.fromValue(status);
+            notifications = notificationRepository.findByUserUserIdAndStatus(userId, notificationStatus, pageable);
         } else {
             notifications = notificationRepository.findByUserUserId(userId, pageable);
         }
@@ -46,7 +48,7 @@ public class NotificationService {
         Notification notification = new Notification();
         notification.setUser(user);
         notification.setMessage(request.getMessage());
-        notification.setStatus(Notification.NotificationStatus.valueOf("Chưa đọc"));
+        notification.setStatus(Notification.NotificationStatus.CHUA_DOC);
         notification.setCreatedAt(LocalDateTime.now());
         
         Notification savedNotification = notificationRepository.save(notification);
@@ -59,7 +61,7 @@ public class NotificationService {
         Notification notification = notificationRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Notification not found with id: " + id));
         
-        notification.setStatus(Notification.NotificationStatus.valueOf("Đã đọc"));
+        notification.setStatus(Notification.NotificationStatus.DA_DOC);
         Notification updatedNotification = notificationRepository.save(notification);
         
         return convertToNotificationResponse(updatedNotification);
@@ -71,7 +73,7 @@ public class NotificationService {
             throw new ResourceNotFoundException("User not found with id: " + userId);
         }
         
-        notificationRepository.updateStatusForUser(userId, "Đã đọc");
+        notificationRepository.updateStatusForUser(userId, Notification.NotificationStatus.DA_DOC);
     }
     
     private NotificationResponse convertToNotificationResponse(Notification notification) {
@@ -79,7 +81,7 @@ public class NotificationService {
                 .id(notification.getNotificationId())
                 .userId(notification.getUser().getUserId())
                 .message(notification.getMessage())
-                .status(String.valueOf(notification.getStatus()))
+                .status(notification.getStatus().getValue())
                 .createdAt(notification.getCreatedAt())
                 .build();
     }

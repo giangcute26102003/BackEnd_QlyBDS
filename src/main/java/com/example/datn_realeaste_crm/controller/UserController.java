@@ -1,7 +1,7 @@
 package com.example.datn_realeaste_crm.controller;
 
 import com.example.datn_realeaste_crm.audit.Auditable;
-import com.example.datn_realeaste_crm.dto.request.PropertyAccessRequest;
+import com.example.datn_realeaste_crm.dto.request.DistrictAccessRequest;
 import com.example.datn_realeaste_crm.dto.request.RoleAssignmentRequest;
 import com.example.datn_realeaste_crm.dto.request.UserCreateRequest;
 import com.example.datn_realeaste_crm.dto.request.UserUpdateRequest;
@@ -18,6 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.bind.annotation.*;
+import com.example.datn_realeaste_crm.dto.request.UserSearchRequest;
 
 @RestController
 @RequestMapping("/users")
@@ -27,7 +28,7 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping
-    @PreAuthorize("hasPermission('ADMIN') or hasRole('MANAGER')")
+//    @PreAuthorize("hasPermission('ADMIN')")
     public ResponseEntity<Page<UserResponse>> getAllUsers(
             @RequestParam(required = false) Integer departmentId,
             @RequestParam(required = false) Boolean isActive,
@@ -89,19 +90,19 @@ public class UserController {
         return ResponseEntity.ok(userService.removeRole(userId, roleId));
     }
 
-    @PostMapping("/property-access")
+    @PostMapping("/district-access")
     @PreAuthorize("hasAuthority('user_assign_property')")
-    @Auditable(action = "ASSIGN_PROPERTY_ACCESS", entityType = "UserPropertyAccess")
-    public ResponseEntity<Void> assignPropertyAccess(@Valid @RequestBody PropertyAccessRequest request) {
-        userService.assignPropertyAccess(request.getUserId(), request.getPropertyId());
+    @Auditable(action = "ASSIGN_DISTRICT_ACCESS", entityType = "UserDistrictAccess")
+    public ResponseEntity<Void> assignDistrictAccess(@Valid @RequestBody DistrictAccessRequest request) {
+        userService.assignDistrictAccess(request.getUserId(), request.getDistrictId());
         return ResponseEntity.ok().build();
     }
 
-    @DeleteMapping("/property-access")
+    @DeleteMapping("/district-access")
     @PreAuthorize("hasAuthority('user_assign_property')")
-    @Auditable(action = "REMOVE_PROPERTY_ACCESS", entityType = "UserPropertyAccess")
-    public ResponseEntity<Void> removePropertyAccess(@Valid @RequestBody PropertyAccessRequest request) {
-        userService.removePropertyAccess(request.getUserId(), request.getPropertyId());
+    @Auditable(action = "REMOVE_DISTRICT_ACCESS", entityType = "UserDistrictAccess")
+    public ResponseEntity<Void> removeDistrictAccess(@Valid @RequestBody DistrictAccessRequest request) {
+        userService.removeDistrictAccess(request.getUserId(), request.getDistrictId());
         return ResponseEntity.ok().build();
     }
 
@@ -123,5 +124,57 @@ public class UserController {
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER') or #id == authentication.principal.userId")
     public ResponseEntity<?> getUserRoles(@PathVariable("id") Integer id) {
         return ResponseEntity.ok(userService.getUserRoles(id));
+    }
+
+    /**
+     * Tìm kiếm users với nhiều tiêu chí
+     */
+    @PostMapping("/search")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    public ResponseEntity<Page<UserResponse>> searchUsers(
+            @RequestBody UserSearchRequest searchRequest,
+            Pageable pageable) {
+        // TODO: Implement advanced user search
+        // return ResponseEntity.ok(userService.searchUsers(searchRequest, pageable));
+        return ResponseEntity.ok(userService.getAllUsers(null, null, pageable));
+    }
+
+    /**
+     * Export danh sách users ra Excel/CSV
+     */
+    @GetMapping("/export")
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<String> exportUsers(
+            @RequestParam(defaultValue = "excel") String format,
+            @RequestParam(required = false) Integer departmentId,
+            @RequestParam(required = false) Boolean isActive) {
+        // TODO: Implement export functionality
+        // return userService.exportUsers(format, departmentId, isActive);
+        return ResponseEntity.ok("Export functionality - to be implemented");
+    }
+
+    /**
+     * Bulk import users từ Excel/CSV
+     */
+    @PostMapping("/bulk-import")
+    @PreAuthorize("hasRole('ADMIN')")
+    @Auditable(action = "BULK_IMPORT_USERS", entityType = "User", logResult = true)
+    public ResponseEntity<String> bulkImportUsers(
+            @RequestParam("file") String fileContent,
+            @RequestParam(defaultValue = "excel") String format) {
+        // TODO: Implement bulk import functionality
+        // return ResponseEntity.ok(userService.bulkImportUsers(fileContent, format));
+        return ResponseEntity.ok("Bulk import functionality - to be implemented");
+    }
+
+    /**
+     * Lấy user statistics tổng quan
+     */
+    @GetMapping("/statistics")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    public ResponseEntity<?> getUserStatistics() {
+        // TODO: Implement user statistics
+        // return ResponseEntity.ok(userService.getUserStatistics());
+        return ResponseEntity.ok("User statistics - to be implemented");
     }
 }

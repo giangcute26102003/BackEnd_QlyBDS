@@ -1,0 +1,87 @@
+@startuml Authentication Use Case
+!theme plain
+skinparam actorStyle awesome
+skinparam usecase {
+    BackgroundColor #E8F4FD
+    BorderColor #2E86AB
+    ArrowColor #2E86AB
+}
+
+title Luồng Xác Thực và Phân Quyền - Use Case Chi Tiết
+
+' Actors
+actor "User" as user
+actor "Admin" as admin
+actor "System" as system
+
+' Use Cases
+usecase "Đăng nhập" as login
+usecase "Xác thực thông tin đăng nhập" as validateLogin
+usecase "Tạo JWT Token" as createToken
+usecase "Lưu Refresh Token" as saveRefreshToken
+usecase "Đăng xuất" as logout
+usecase "Hủy Token" as invalidateToken
+usecase "Làm mới Token" as refreshToken
+usecase "Xác thực JWT Token" as validateJWT
+usecase "Quên mật khẩu" as forgotPassword
+usecase "Gửi email reset" as sendResetEmail
+usecase "Đặt lại mật khẩu" as resetPassword
+usecase "Xác thực reset token" as validateResetToken
+usecase "Xác thực email" as verifyEmail
+usecase "Gửi email xác thực" as sendVerificationEmail
+usecase "Kiểm tra quyền truy cập" as checkPermission
+usecase "Phân quyền theo role" as authorizeByRole
+usecase "Ghi log hoạt động" as logActivity
+
+' Relationships
+user --> login
+login --> validateLogin
+validateLogin --> system
+system --> createToken
+system --> saveRefreshToken
+system --> logActivity
+
+user --> logout
+logout --> invalidateToken
+invalidateToken --> system
+system --> logActivity
+
+user --> refreshToken
+refreshToken --> validateJWT
+validateJWT --> system
+system --> createToken
+system --> logActivity
+
+user --> forgotPassword
+forgotPassword --> sendResetEmail
+sendResetEmail --> system
+system --> logActivity
+
+user --> resetPassword
+resetPassword --> validateResetToken
+validateResetToken --> system
+system --> logActivity
+
+user --> verifyEmail
+verifyEmail --> sendVerificationEmail
+sendVerificationEmail --> system
+system --> logActivity
+
+admin --> checkPermission
+checkPermission --> authorizeByRole
+authorizeByRole --> system
+system --> logActivity
+
+' Include relationships
+login ..> checkPermission : <<include>>
+refreshToken ..> checkPermission : <<include>>
+resetPassword ..> checkPermission : <<include>>
+
+' Extend relationships
+validateLogin <.. system : <<extend>>
+createToken <.. system : <<extend>>
+invalidateToken <.. system : <<extend>>
+validateJWT <.. system : <<extend>>
+
+@enduml
+

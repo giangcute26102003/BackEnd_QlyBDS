@@ -13,4 +13,7 @@ public class LoginRequest {
     
     @NotBlank(message = "Password is required")
     private String password;
+    
+    @NotBlank(message = "Selected role is required")
+    private String selectedRole;
 }

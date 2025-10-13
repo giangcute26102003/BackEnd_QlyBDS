@@ -7,7 +7,6 @@ import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.JwtException;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.SignatureAlgorithm;
-import io.jsonwebtoken.io.Decoders;
 import io.jsonwebtoken.security.Keys;
 import jakarta.annotation.PostConstruct;
 import lombok.extern.slf4j.Slf4j;
@@ -26,8 +25,6 @@ import java.security.Key;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.*;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
@@ -35,9 +32,7 @@ import java.util.stream.Collectors;
 public class JwtTokenProvider {
 
     private Key key;
-
     private final TokenRepository tokenRepository;
-
     private final UserDetailsService userDetailsService;
 
     @Value("${jwt.secret}")
@@ -58,186 +53,323 @@ public class JwtTokenProvider {
     @PostConstruct
     public void init() {
         try {
-            // Sử dụng string trực tiếp thay vì giải mã BASE64
+            if (secretKey == null || secretKey.trim().isEmpty()) {
+                throw new IllegalArgumentException("JWT secret key cannot be null or empty");
+            }
             byte[] keyBytes = secretKey.getBytes(StandardCharsets.UTF_8);
             this.key = Keys.hmacShaKeyFor(keyBytes);
+            log.info("JWT key initialized successfully");
         } catch (Exception e) {
             log.error("Failed to initialize JWT key: {}", e.getMessage());
             throw new RuntimeException("Failed to initialize JWT key", e);
         }
     }
 
-    public String createAccessToken(Authentication authentication) {
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+    /**
+     * Generate access token with role and permissions
+     * @param username email của user
+     * @param role vai trò được chọn
+     * @param permissions danh sách quyền tương ứng với role
+     * @return JWT access token
+     */
+    public String generateAccessToken(String username, String role, Set<String> permissions) {
+        if (username == null || username.trim().isEmpty()) {
+            throw new IllegalArgumentException("Username cannot be null or empty");
+        }
+        if (role == null || role.trim().isEmpty()) {
+            throw new IllegalArgumentException("Role cannot be null or empty");
+        }
+        if (permissions == null) {
+            permissions = Collections.emptySet();
+        }
+
         Date now = new Date();
         Date validity = new Date(now.getTime() + accessTokenExpiration);
 
-        Set<String> authorities = authentication.getAuthorities().stream()
-                .map(GrantedAuthority::getAuthority)
-                .collect(Collectors.toSet());
-
-        return Jwts.builder()
-                .setSubject(userDetails.getUsername())
-                .claim("auth", authorities)
-                .claim("type", "access")
-                .setIssuedAt(now)
-                .setExpiration(validity)
-                .signWith(key, SignatureAlgorithm.HS256)
-                .compact();
+        try {
+            return Jwts.builder()
+                    .setSubject(username)
+                    .claim("role", role)
+                    .claim("permissions", new ArrayList<>(permissions)) // Convert to List for consistent serialization
+                    .claim("type", "access")
+                    .setIssuedAt(now)
+                    .setExpiration(validity)
+                    .signWith(key, SignatureAlgorithm.HS256)
+                    .compact();
+        } catch (Exception e) {
+            log.error("Failed to generate access token for user: {}", username, e);
+            throw new RuntimeException("Failed to generate access token", e);
+        }
     }
 
-    public String createRefreshToken(Authentication authentication) {
-        UserDetails userDetails = (UserDetails) authentication.getPrincipal();
+    /**
+     * Generate refresh token with role information
+     * @param user User entity
+     * @param role selected role
+     * @return JWT refresh token
+     */
+    public String generateRefreshToken(User user, String role) {
+        if (user == null || user.getEmail() == null) {
+            throw new IllegalArgumentException("User and user email cannot be null");
+        }
+        if (role == null || role.trim().isEmpty()) {
+            throw new IllegalArgumentException("Role cannot be null or empty");
+        }
+
         Date now = new Date();
         Date validity = new Date(now.getTime() + refreshTokenExpiration);
 
-        String refreshToken = Jwts.builder()
-                .setSubject(userDetails.getUsername())
-                .claim("type", "refresh")
-                .setIssuedAt(now)
-                .setExpiration(validity)
-                .signWith(key, SignatureAlgorithm.HS256)
-                .compact();
-
-        // Save token to database
-        saveToken((User) userDetails, refreshToken, "refresh", validity);
-
-        return refreshToken;
-    }
-
-    private void saveToken(User user, String token, String tokenType, Date validity) {
-        Token tokenEntity = new Token();
-        tokenEntity.setUser(user);
-        tokenEntity.setToken(token);
-        tokenEntity.setTokenType(tokenType);
-        tokenEntity.setExpirationDate(LocalDateTime.ofInstant(validity.toInstant(), ZoneId.systemDefault()));
-        tokenRepository.save(tokenEntity);
-    }
-
-    public Authentication getAuthentication(String token) {
-        Claims claims = Jwts.parserBuilder()
-                .setSigningKey(key)
-                .build()
-                .parseClaimsJws(token)
-                .getBody();
-
-//        Collection<GrantedAuthority> authorities = new ArrayList<>();
-
-        // Check if "auth" claim exists
-//        if (claims.containsKey("auth")) {
-//            Object authClaim = claims.get("auth");
-//            log.debug("Auth claim type: {}", authClaim.getClass().getName());
-//
-//            if (authClaim instanceof List) {
-//                List<String> roles = claims.get("auth", List.class);
-//                authorities = roles.stream()
-//                        .map(SimpleGrantedAuthority::new)
-//                        .collect(Collectors.toList());
-//            } else if (authClaim instanceof LinkedHashMap || authClaim instanceof Map) {
-//                // Handle case where auth is a Map (common with Sets serialized to JSON)
-//                Collection<?> values = ((Map<?, ?>) authClaim).values();
-//                authorities = values.stream()
-//                        .map(Object::toString)
-//                        .map(SimpleGrantedAuthority::new)
-//                        .collect(Collectors.toList());
-//            } else if (authClaim instanceof String) {
-//                // Handle case where auth is a comma-separated string
-//                authorities = Arrays.stream(authClaim.toString().split(","))
-//                        .filter(auth -> !auth.trim().isEmpty())
-//                        .map(SimpleGrantedAuthority::new)
-//                        .collect(Collectors.toList());
-//            } else if (authClaim instanceof Collection) {
-//                // Handle case where auth might be a Set or another collection type
-//                authorities = ((Collection<?>) authClaim).stream()
-//                        .map(Object::toString)
-//                        .map(SimpleGrantedAuthority::new)
-//                        .collect(Collectors.toList());
-//            }
-//
-//            log.debug("Extracted authorities: {}", authorities);
-//        } else {
-//            log.warn("No 'auth' claim found in token");
-//        }
-//
-//        return new UsernamePasswordAuthenticationToken(claims.getSubject(), "", authorities);
-        String email = claims.getSubject();
-
-        // Load user details from DB
-        UserDetails userDetails = userDetailsService.loadUserByUsername(email);
-
-        Collection<GrantedAuthority> authorities = extractAuthorities(claims);
-
-        return new UsernamePasswordAuthenticationToken(userDetails, null, authorities);
-    }
-
-    public boolean validateToken(String token) {
         try {
-            Jwts.parserBuilder().setSigningKey(key).build().parseClaimsJws(token);
+            String refreshToken = Jwts.builder()
+                    .setSubject(user.getEmail())
+                    .claim("role", role)
+                    .claim("type", "refresh")
+                    .setIssuedAt(now)
+                    .setExpiration(validity)
+                    .signWith(key, SignatureAlgorithm.HS256)
+                    .compact();
 
-            // Check if token is revoked
-            if (tokenRepository.findByTokenAndRevokedTrue(token).isPresent()) {
-                return false;
+            // Save token to database
+            saveToken(user, refreshToken, "refresh", validity);
+            return refreshToken;
+        } catch (Exception e) {
+            log.error("Failed to generate refresh token for user: {}", user.getEmail(), e);
+            throw new RuntimeException("Failed to generate refresh token", e);
+        }
+    }
+
+    /**
+     * Extract role from JWT token
+     * @param token JWT token
+     * @return role name
+     */
+    public String getRoleFromToken(String token) {
+        if (token == null || token.trim().isEmpty()) {
+            throw new IllegalArgumentException("Token cannot be null or empty");
+        }
+
+        try {
+            Claims claims = parseToken(token);
+            return claims.get("role", String.class);
+        } catch (Exception e) {
+            log.error("Failed to extract role from token", e);
+            throw new RuntimeException("Failed to extract role from token", e);
+        }
+    }
+
+    /**
+     * Extract permissions from JWT token
+     * @param token JWT token
+     * @return set of permissions
+     */
+    @SuppressWarnings("unchecked")
+    public Set<String> getPermissionsFromToken(String token) {
+        if (token == null || token.trim().isEmpty()) {
+            throw new IllegalArgumentException("Token cannot be null or empty");
+        }
+
+        try {
+            Claims claims = parseToken(token);
+            Object permissionsClaim = claims.get("permissions");
+            
+            if (permissionsClaim instanceof List) {
+                return ((List<String>) permissionsClaim).stream()
+                        .filter(Objects::nonNull)
+                        .collect(Collectors.toSet());
+            } else if (permissionsClaim instanceof Collection) {
+                return ((Collection<?>) permissionsClaim).stream()
+                        .filter(Objects::nonNull)
+                        .map(Object::toString)
+                        .collect(Collectors.toSet());
+            }
+            
+            return Collections.emptySet();
+        } catch (Exception e) {
+            log.error("Failed to extract permissions from token", e);
+            return Collections.emptySet();
+        }
+    }
+
+    /**
+     * Get Authentication object from token
+     * @param token JWT token
+     * @return Authentication object
+     */
+    public Authentication getAuthentication(String token) {
+        if (token == null || token.trim().isEmpty()) {
+            throw new IllegalArgumentException("Token cannot be null or empty");
+        }
+
+        try {
+            Claims claims = parseToken(token);
+            String username = claims.getSubject();
+            
+            if (username == null || username.trim().isEmpty()) {
+                throw new IllegalArgumentException("Token subject cannot be null or empty");
             }
 
+            // Extract authorities from role and permissions
+            Collection<GrantedAuthority> authorities = extractAuthorities(claims);
+            
+            log.debug("Extracted authorities for user {}: {}", username, authorities);
+            return new UsernamePasswordAuthenticationToken(username, null, authorities);
+        } catch (Exception e) {
+            log.error("Failed to get authentication from token", e);
+            throw new RuntimeException("Failed to get authentication from token", e);
+        }
+    }
+
+    /**
+     * Validate JWT token
+     * @param token JWT token
+     * @return true if valid, false otherwise
+     */
+    public boolean validateToken(String token) {
+        if (token == null || token.trim().isEmpty()) {
+            log.warn("Token is null or empty");
+            return false;
+        }
+        try {
+            // Parse and validate token signature and expiration
+            parseToken(token);
+            // Check if token is revoked
+            if (tokenRepository.findByTokenAndRevokedTrue(token).isPresent()) {
+                log.warn("Token is revoked");
+                return false;
+            }
             return true;
         } catch (io.jsonwebtoken.ExpiredJwtException e) {
-            log.warn("Expired JWT token: {}", e.getMessage());
+            log.warn("JWT token is expired: {}", e.getMessage());
             return false;
         } catch (JwtException | IllegalArgumentException e) {
-            log.error("Invalid JWT token: {}", e.getMessage());
+            log.warn("Invalid JWT token: {}", e.getMessage());
             return false;
         }
     }
 
+    /**
+     * Revoke a token
+     * @param token JWT token to revoke
+     */
     public void revokeToken(String token) {
-        tokenRepository.findByToken(token).ifPresent(tokenEntity -> {
-            tokenEntity.setRevoked(true);
-            tokenRepository.save(tokenEntity);
-        });
+        if (token == null || token.trim().isEmpty()) {
+            log.warn("Cannot revoke null or empty token");
+            return;
+        }
+
+        try {
+            tokenRepository.findByToken(token).ifPresentOrElse(
+                tokenEntity -> {
+                    tokenEntity.setRevoked(true);
+                    tokenRepository.save(tokenEntity);
+                    log.info("Token revoked successfully");
+                },
+                () -> log.warn("Token not found in database for revocation")
+            );
+        } catch (Exception e) {
+            log.error("Failed to revoke token", e);
+        }
     }
 
+    /**
+     * Extract username from token
+     * @param token JWT token
+     * @return username
+     */
     public String getUsernameFromToken(String token) {
+        if (token == null || token.trim().isEmpty()) {
+            throw new IllegalArgumentException("Token cannot be null or empty");
+        }
+
+        try {
+            Claims claims = parseToken(token);
+            return claims.getSubject();
+        } catch (Exception e) {
+            log.error("Failed to extract username from token", e);
+            throw new RuntimeException("Failed to extract username from token", e);
+        }
+    }
+
+    /**
+     * Check if token is refresh token
+     * @param token JWT token
+     * @return true if refresh token, false otherwise
+     */
+    public boolean isRefreshToken(String token) {
+        if (token == null || token.trim().isEmpty()) {
+            return false;
+        }
+
+        try {
+            Claims claims = parseToken(token);
+            return "refresh".equals(claims.get("type"));
+        } catch (Exception e) {
+            log.warn("Failed to check if token is refresh token: {}", e.getMessage());
+            return false;
+        }
+    }
+
+    /**
+     * Parse JWT token and extract claims
+     * @param token JWT token
+     * @return Claims object
+     */
+    private Claims parseToken(String token) {
         return Jwts.parserBuilder()
                 .setSigningKey(key)
                 .build()
                 .parseClaimsJws(token)
-                .getBody()
-                .getSubject();
+                .getBody();
     }
 
-    // public boolean isRefreshToken(String token) {
-    // Claims claims = Jwts.parserBuilder()
-    // .setSigningKey(key)
-    // .build()
-    // .parseClaimsJws(token)
-    // .getBody();
-    //
-    // return "refresh".equals(claims.get("type"));
-    // }
-    public boolean isRefreshToken(String token) {
-        try {
-            Claims claims = Jwts.parserBuilder()
-                    .setSigningKey(key)
-                    .build()
-                    .parseClaimsJws(token)
-                    .getBody();
-
-            return "refresh".equals(claims.get("type"));
-        } catch (JwtException | IllegalArgumentException e) {
-            log.warn("Invalid or expired JWT while checking refresh token: {}", e.getMessage());
-            return false;
-        }
-    }
-
+    /**
+     * Extract authorities from token claims
+     * @param claims JWT claims
+     * @return Collection of GrantedAuthority
+     */
     private Collection<GrantedAuthority> extractAuthorities(Claims claims) {
-        Object authClaim = claims.get("auth");
-        if (authClaim instanceof Collection<?>) {
-            return ((Collection<?>) authClaim).stream()
-                    .map(Object::toString)
-                    .map(SimpleGrantedAuthority::new)
-                    .collect(Collectors.toList());
-        }
-        return Collections.emptyList();
+        Set<GrantedAuthority> authorities = new HashSet<>();
 
+        // Add role as authority with ROLE_ prefix
+        String role = claims.get("role", String.class);
+        if (role != null && !role.trim().isEmpty()) {
+            authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
+        }
+
+        // Add permissions as authorities
+        Object permissionsClaim = claims.get("permissions");
+        if (permissionsClaim instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<String> permissions = (List<String>) permissionsClaim;
+            permissions.stream()
+                    .filter(Objects::nonNull)
+                    .filter(perm -> !perm.trim().isEmpty())
+                    .map(SimpleGrantedAuthority::new)
+                    .forEach(authorities::add);
+        }
+
+        return authorities;
+    }
+
+    /**
+     * Save token to database
+     * @param user User entity
+     * @param token JWT token string
+     * @param tokenType Type of token (access/refresh)
+     * @param validity Expiration date
+     */
+    private void saveToken(User user, String token, String tokenType, Date validity) {
+        try {
+            Token tokenEntity = new Token();
+            tokenEntity.setUser(user);
+            tokenEntity.setToken(token);
+            tokenEntity.setTokenType(tokenType);
+            tokenEntity.setExpirationDate(LocalDateTime.ofInstant(validity.toInstant(), ZoneId.systemDefault()));
+            tokenRepository.save(tokenEntity);
+            log.debug("Token saved to database for user: {}", user.getEmail());
+        } catch (Exception e) {
+            log.error("Failed to save token to database for user: {}", user.getEmail(), e);
+            // Don't throw exception here as token generation should still succeed
+        }
     }
 }

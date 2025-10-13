@@ -2,6 +2,9 @@ package com.example.datn_realeaste_crm.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.hibernate.annotations.CreationTimestamp;
+
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "property_images")
@@ -21,6 +24,19 @@ public class PropertyImage {
     @JoinColumn(name = "property_id", nullable = false)
     private Property property;
     
-    @Column(name = "image_url")
+    @Column(name = "image_url", nullable = false)
     private String imageUrl;
+    
+    @Column(name = "original_filename")
+    private String originalFilename;
+    
+    @Column(name = "file_size")
+    private Long fileSize;
+    
+    @Column(name = "content_type")
+    private String contentType;
+    
+    @CreationTimestamp
+    @Column(name = "uploaded_at")
+    private LocalDateTime uploadedAt;
 }

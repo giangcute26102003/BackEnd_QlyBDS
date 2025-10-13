@@ -22,7 +22,7 @@ public class InteractionController {
     private final InteractionService interactionService;
     
     @GetMapping
-    @PreAuthorize("hasAuthority('interaction_view')")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Page<InteractionResponse>> getAllInteractions(
             @RequestParam(required = false) Integer customerId,
             @RequestParam(required = false) Integer propertyId,

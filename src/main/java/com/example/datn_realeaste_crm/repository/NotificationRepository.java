@@ -16,11 +16,11 @@ public interface NotificationRepository extends JpaRepository<Notification, Inte
     
     Page<Notification> findByUserUserId(Integer userId, Pageable pageable);
     
-    Page<Notification> findByUserUserIdAndStatus(Integer userId, String status, Pageable pageable);
+    Page<Notification> findByUserUserIdAndStatus(Integer userId, Notification.NotificationStatus status, Pageable pageable);
     
     @Modifying
-    @Query("UPDATE Notification n SET n.status = :status WHERE n.user.userId = :userId AND n.status = 'Chưa đọc'")
-    void updateStatusForUser(@Param("userId") Integer userId, @Param("status") String status);
+    @Query("UPDATE Notification n SET n.status = :status WHERE n.user.userId = :userId AND n.status = com.example.datn_realeaste_crm.entity.Notification$NotificationStatus.CHUA_DOC")
+    void updateStatusForUser(@Param("userId") Integer userId, @Param("status") Notification.NotificationStatus status);
     
-    long countByUserUserIdAndStatus(Integer userId, String status);
+    long countByUserUserIdAndStatus(Integer userId, Notification.NotificationStatus status);
 }
