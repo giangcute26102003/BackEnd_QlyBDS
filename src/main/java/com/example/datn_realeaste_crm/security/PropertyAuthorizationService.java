@@ -26,6 +26,7 @@ public class PropertyAuthorizationService {
     private final UserRepository userRepository;
     private final PropertyOwnershipRepository propertyOwnershipRepository;
     private final UserDistrictAccessRepository userDistrictAccessRepository;
+    private final com.example.datn_realeaste_crm.security.crypto.DeterministicHasher deterministicHasher;
 
     /**
      * Check if the current user can access the specified property
@@ -247,7 +248,9 @@ public class PropertyAuthorizationService {
         }
 
         String email = authentication.getName();
-        return userRepository.findByEmail(email).orElse(null);
+        String normalizedEmail = email == null ? null : email.trim().toLowerCase(java.util.Locale.ROOT);
+        byte[] emailHash = deterministicHasher.emailHash(normalizedEmail);
+        return userRepository.findByEmailHash(emailHash).orElse(null);
     }
 
     /**

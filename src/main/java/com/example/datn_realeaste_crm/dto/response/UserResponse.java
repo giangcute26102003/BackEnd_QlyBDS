@@ -6,6 +6,7 @@ import lombok.Data;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 import java.util.Set;
 
 @Data
@@ -25,6 +26,9 @@ public class UserResponse {
     private Integer departmentId;
     private String departmentName;
     private Set<String> roles;
+    
+    // Districts mà user được phân quyền truy cập
+    private List<Integer> assignedDistricts;
     
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;

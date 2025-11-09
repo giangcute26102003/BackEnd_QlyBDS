@@ -32,16 +32,26 @@ public class User implements UserDetails {
     @Column(name = "name", nullable = false)
     private String name;
     
-    @Column(name = "phone_number")
+    // Encrypted fields with deterministic hash for lookups
+    @Convert(converter = com.example.datn_realeaste_crm.security.crypto.StringAttributeEncryptor.class)
+    @Column(name = "phone_number_enc")
     private String phoneNumber;
     
-    @Column(name = "email")
+    @Column(name = "phone_hash", columnDefinition = "BINARY(32)")
+    private byte[] phoneHash;
+    
+    @Convert(converter = com.example.datn_realeaste_crm.security.crypto.StringAttributeEncryptor.class)
+    @Column(name = "email_enc")
     private String email;
+    
+    @Column(name = "email_hash", columnDefinition = "BINARY(32)")
+    private byte[] emailHash;
     
     @Column(name = "password", nullable = false)
     private String password;
     
-    @Column(name = "address", columnDefinition = "TEXT")
+    @Convert(converter = com.example.datn_realeaste_crm.security.crypto.StringAttributeEncryptor.class)
+    @Column(name = "address_enc", columnDefinition = "BLOB")
     private String address;
     
     @Column(name = "dob")

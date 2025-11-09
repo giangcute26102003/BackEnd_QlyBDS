@@ -21,6 +21,7 @@ public class RoleHierarchyService {
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
+    private final com.example.datn_realeaste_crm.security.crypto.DeterministicHasher deterministicHasher;
 
     // Define role hierarchy levels (lower number = higher authority)
     private static final Map<String, Integer> ROLE_HIERARCHY = Map.of(
@@ -220,7 +221,9 @@ public class RoleHierarchyService {
         }
         
         String email = authentication.getName();
-        return userRepository.findByEmail(email)
+        String normalizedEmail = email == null ? null : email.trim().toLowerCase(java.util.Locale.ROOT);
+        byte[] emailHash = deterministicHasher.emailHash(normalizedEmail);
+        return userRepository.findByEmailHash(emailHash)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
     }
 

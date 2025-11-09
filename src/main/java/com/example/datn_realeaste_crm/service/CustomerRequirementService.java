@@ -29,6 +29,7 @@ public class CustomerRequirementService {
     private final CustomerRequirementsRepository customerRequirementsRepository;
     private final CustomerRepository customerRepository;
     private final UserRepository userRepository;
+    private final com.example.datn_realeaste_crm.security.crypto.DeterministicHasher deterministicHasher;
     
     /**
      * Get all requirements with authorization filtering
@@ -193,7 +194,9 @@ public class CustomerRequirementService {
         }
         
         String email = authentication.getName();
-        return userRepository.findByEmail(email)
+        String normalizedEmail = email == null ? null : email.trim().toLowerCase(java.util.Locale.ROOT);
+        byte[] emailHash = deterministicHasher.emailHash(normalizedEmail);
+        return userRepository.findByEmailHash(emailHash)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
     }
     

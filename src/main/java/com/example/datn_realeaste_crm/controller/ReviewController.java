@@ -29,7 +29,7 @@ public class ReviewController {
     }
     
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('review_view') or @propertyAuthorizationService.isPropertyOwner(authentication, #id)")
+    @PreAuthorize("hasAuthority('review_view') or isAuthenticated()")
     public ResponseEntity<ReviewResponse> getReview(@PathVariable Integer id) {
         return ResponseEntity.ok(reviewService.getReview(id));
     }
@@ -39,6 +39,30 @@ public class ReviewController {
     @Auditable(action = "CREATE_REVIEW", entityType = "Review", logResult = true)
     public ResponseEntity<ReviewResponse> createReview(@Valid @RequestBody ReviewRequest request) {
         return new ResponseEntity<>(reviewService.createReview(request), HttpStatus.CREATED);
+    }
+    
+    @PutMapping("/{id}")
+    @PreAuthorize("isAuthenticated()")
+    @Auditable(action = "UPDATE_REVIEW", entityType = "Review", entityIdParam = "id", logResult = true)
+    public ResponseEntity<ReviewResponse> updateReview(
+            @PathVariable Integer id,
+            @Valid @RequestBody ReviewRequest request) {
+        return ResponseEntity.ok(reviewService.updateReview(id, request));
+    }
+    
+    @GetMapping("/user/{userId}")
+    public ResponseEntity<Page<ReviewResponse>> getUserReviews(
+            @PathVariable Integer userId,
+            Pageable pageable) {
+        return ResponseEntity.ok(reviewService.getUserReviews(userId, pageable));
+    }
+    
+    @GetMapping("/my-reviews")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Page<ReviewResponse>> getMyReviews(
+            @RequestParam(required = false) Integer propertyId,
+            Pageable pageable) {
+        return ResponseEntity.ok(reviewService.getMyReviews(propertyId, pageable));
     }
     
     @DeleteMapping("/{id}")

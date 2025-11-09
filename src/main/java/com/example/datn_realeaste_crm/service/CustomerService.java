@@ -28,23 +28,24 @@ public class CustomerService {
     
     private final CustomerRepository customerRepository;
     private final UserRepository userRepository;
+    private final com.example.datn_realeaste_crm.security.crypto.DeterministicHasher deterministicHasher;
+
+    // Normalization helpers for consistent hashing
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private String normalizePhone(String phone) {
+        return phone == null ? null : phone.replaceAll("\\D", ""); // Keep digits only
+    }
     
     public Page<CustomerResponse> getAllCustomers(Pageable pageable) {
         User currentUser = getCurrentUser();
         
-        // Check if user has ADMIN role to see all customers
-        boolean isAdmin = currentUser.getUserRoles().stream()
-                .anyMatch(userRole -> "ADMIN".equals(userRole.getRole().getRoleName()));
-        
-        if (isAdmin) {
-            log.debug("Admin user {} accessing all customers", currentUser.getEmail());
-            return customerRepository.findAllWithUser(pageable)
-                    .map(this::convertToCustomerResponse);
-        } else {
-            log.debug("User {} accessing own customers only", currentUser.getEmail());
-            return customerRepository.findByUserUserId(currentUser.getUserId(), pageable)
-                    .map(this::convertToCustomerResponse);
-        }
+        // All users (including admin) can only see their own customers
+        log.debug("User {} accessing own customers only", currentUser.getEmail());
+        return customerRepository.findByUserUserId(currentUser.getUserId(), pageable)
+                .map(this::convertToCustomerResponse);
     }
     
     public CustomerResponse getCustomer(Integer id) {
@@ -106,8 +107,21 @@ public class CustomerService {
     
     private void updateCustomerFromRequest(Customer customer, CustomerRequest request) {
         customer.setName(request.getName());
-        customer.setPhoneNumber(request.getPhoneNumber());
-        customer.setEmail(request.getEmail());
+        
+        // Set encrypted email with hash
+        if (request.getEmail() != null) {
+            String normalizedEmail = normalizeEmail(request.getEmail());
+            customer.setEmail(normalizedEmail);
+            customer.setEmailHash(deterministicHasher.emailHash(normalizedEmail));
+        }
+        
+        // Set encrypted phone with hash
+        if (request.getPhoneNumber() != null) {
+            String normalizedPhone = normalizePhone(request.getPhoneNumber());
+            customer.setPhoneNumber(normalizedPhone);
+            customer.setPhoneHash(deterministicHasher.phoneHash(normalizedPhone));
+        }
+        
         customer.setAddress(request.getAddress());
         customer.setDob(request.getDob());
     }
@@ -138,7 +152,10 @@ public class CustomerService {
         }
         
         String email = authentication.getName();
-        return userRepository.findByEmail(email)
+        String normalizedEmail = normalizeEmail(email);
+        byte[] emailHash = deterministicHasher.emailHash(normalizedEmail);
+        
+        return userRepository.findByEmailHash(emailHash)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
     }
     

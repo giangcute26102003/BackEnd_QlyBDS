@@ -67,10 +67,33 @@ public class PropertyController {
     }
 
     @GetMapping("/owned")
-   @PreAuthorize("hasAuthority('PROPERTY_OWNER')")
-    public ResponseEntity<?> getOwnedProperties() {
-        // Return properties owned by the current user
-        return ResponseEntity.ok(propertyService.getPropertiesOwnedByCurrentUser());
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Page<PropertyResponse>> getOwnedProperties(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String propertyType,
+            Pageable pageable) {
+        // Return properties owned by the current user with pagination and filters
+        return ResponseEntity.ok(propertyService.getOwnedProperties(status, propertyType, pageable));
+    }
+    
+    @PutMapping("/owned/{id}")
+//    @PreAuthorize("isAuthenticated()")
+    @Auditable(action = "UPDATE_OWNED_PROPERTY", entityType = "Property", entityIdParam = "id", logParams = true)
+    public ResponseEntity<PropertyResponse> updateOwnedProperty(
+            @PathVariable Integer id,
+            @Valid @RequestBody PropertyRequest propertyRequest) {
+        // Property owner can update their own property (status will be reset to PENDING)
+        System.out.println("261002003");
+        return ResponseEntity.ok(propertyService.updateOwnedProperty(id, propertyRequest));
+    }
+    
+    @GetMapping("/owned/{id}/reviews")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Page<com.example.datn_realeaste_crm.dto.response.ReviewResponse>> getOwnedPropertyReviews(
+            @PathVariable Integer id,
+            Pageable pageable) {
+        // Get all reviews for a property owned by current user
+        return ResponseEntity.ok(propertyService.getOwnedPropertyReviews(id, pageable));
     }
 
     @GetMapping("/assigned")
@@ -108,6 +131,32 @@ public class PropertyController {
         // Create a new property
         return ResponseEntity.ok(propertyService.createProperty(propertyRequest));
     }
+    
+    @PostMapping("/{id}/thumbnail")
+//    @PreAuthorize("hasRole('ADMIN') or @propertyAuthorizationService.isPropertyOwner(#id)")
+    @Auditable(action = "UPLOAD_PROPERTY_THUMBNAIL", entityType = "Property", entityIdParam = "id")
+    public ResponseEntity<?> uploadPropertyThumbnail(
+            @PathVariable Integer id,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return ResponseEntity.ok(propertyService.uploadPropertyThumbnail(id, file));
+    }
+    
+    @PutMapping("/{id}/thumbnail")
+    @PreAuthorize("hasRole('ADMIN') or @propertyAuthorizationService.isPropertyOwner(#id)")
+    @Auditable(action = "UPDATE_PROPERTY_THUMBNAIL", entityType = "Property", entityIdParam = "id")
+    public ResponseEntity<?> updatePropertyThumbnail(
+            @PathVariable Integer id,
+            @RequestParam("file") org.springframework.web.multipart.MultipartFile file) {
+        return ResponseEntity.ok(propertyService.updatePropertyThumbnail(id, file));
+    }
+    
+    @DeleteMapping("/{id}/thumbnail")
+    @PreAuthorize("hasRole('ADMIN') or @propertyAuthorizationService.isPropertyOwner(#id)")
+    @Auditable(action = "DELETE_PROPERTY_THUMBNAIL", entityType = "Property", entityIdParam = "id")
+    public ResponseEntity<Void> deletePropertyThumbnail(@PathVariable Integer id) {
+        propertyService.deletePropertyThumbnail(id);
+        return ResponseEntity.ok().build();
+    }
 
     @PutMapping("/{id}")
     @PreAuthorize("(hasRole('ADMIN')) or " +
@@ -141,7 +190,7 @@ public class PropertyController {
         return ResponseEntity.ok(propertyService.assignPropertyDistrictToUser(id, userId));
     }
 
-    @PostMapping("/{id}/approve")
+    @PutMapping("/{id}/approve")
 //    @PreAuthorize("hasAnyRole('ADMIN', 'REVIEWER') and hasPermission('PROPERTY_APPROVE')")
     @Auditable(action = "APPROVE_PROPERTY", entityType = "Property", entityIdParam = "id")
     public ResponseEntity<?> approveProperty(@PathVariable Integer id) {
@@ -149,12 +198,12 @@ public class PropertyController {
         return ResponseEntity.ok(propertyService.approveProperty(id));
     }
 
-    @PostMapping("/{id}/reject")
+    @PutMapping("/{id}/reject")
     @PreAuthorize("hasAnyRole('ADMIN', 'REVIEWER')")
     @Auditable(action = "REJECT_PROPERTY", entityType = "Property", entityIdParam = "id", logParams = true)
-    public ResponseEntity<?> rejectProperty(@PathVariable Integer id, @RequestBody String reason) {
+    public ResponseEntity<?> rejectProperty(@PathVariable Integer id) {
         // Reject a property
-        return ResponseEntity.ok(propertyService.rejectProperty(id, reason));
+        return ResponseEntity.ok(propertyService.rejectProperty(id));
     }
 
     // ===== PROPERTY STATUS MANAGEMENT =====

@@ -14,11 +14,16 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Integer> {
 
-    Optional<User> findByEmail(String email);
+    // Hash-based lookups for encrypted fields
+    Optional<User> findByEmailHash(byte[] emailHash);
+    
+    Optional<User> findByPhoneHash(byte[] phoneHash);
+
+    boolean existsByEmailHash(byte[] emailHash);
+    
+    boolean existsByPhoneHash(byte[] phoneHash);
 
     Optional<User> findAllByName(String name);
-
-    boolean existsByEmail(String email);
     
     List<User> findByDepartmentDepartmentId(Integer departmentId);
 

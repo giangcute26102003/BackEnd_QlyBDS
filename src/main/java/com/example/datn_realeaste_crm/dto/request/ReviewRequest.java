@@ -12,4 +12,6 @@ public class ReviewRequest {
     
     @NotBlank(message = "Comment is required")
     private String comment;
+    
+    private String action;
 }

@@ -32,7 +32,7 @@ public class CustomerController {
     
     @GetMapping
     @PreAuthorize("isAuthenticated()")
-    @Operation(summary = "Get all customers", description = "Get paginated list of customers. Admin sees all, regular users see only their own customers.")
+    @Operation(summary = "Get my customers", description = "Get paginated list of customers belonging to the current user.")
     public ResponseEntity<Page<CustomerResponse>> getAllCustomers(Pageable pageable) {
         try {
             Page<CustomerResponse> customers = customerService.getAllCustomers(pageable);

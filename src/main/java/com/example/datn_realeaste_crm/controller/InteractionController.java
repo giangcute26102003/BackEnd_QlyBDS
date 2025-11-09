@@ -22,7 +22,8 @@ public class InteractionController {
     private final InteractionService interactionService;
     
     @GetMapping
-    @PreAuthorize("hasRole('ADMIN')")
+    // @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public ResponseEntity<Page<InteractionResponse>> getAllInteractions(
             @RequestParam(required = false) Integer customerId,
             @RequestParam(required = false) Integer propertyId,
@@ -31,7 +32,7 @@ public class InteractionController {
     }
     
     @GetMapping("/{id}")
-    @PreAuthorize("hasAuthority('interaction_view')")
+//    @PreAuthorize("hasAuthority('interaction_view')")
     public ResponseEntity<InteractionResponse> getInteraction(@PathVariable Integer id) {
         return ResponseEntity.ok(interactionService.getInteraction(id));
     }
@@ -58,5 +59,27 @@ public class InteractionController {
     public ResponseEntity<Void> deleteInteraction(@PathVariable Integer id) {
         interactionService.deleteInteraction(id);
         return ResponseEntity.ok().build();
+    }
+    
+    @GetMapping("/my-interactions")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Page<InteractionResponse>> getMyInteractions(
+            @RequestParam(required = false) Integer propertyId,
+            Pageable pageable) {
+        return ResponseEntity.ok(interactionService.getMyInteractions(propertyId, pageable));
+    }
+    
+    @GetMapping("/my-interactions/statistics")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<java.util.Map<String, Object>> getMyInteractionStatistics() {
+        return ResponseEntity.ok(interactionService.getMyInteractionStatistics());
+    }
+    
+    @GetMapping("/property/{propertyId}")
+    @PreAuthorize("isAuthenticated()")
+    public ResponseEntity<Page<InteractionResponse>> getPropertyInteractions(
+            @PathVariable Integer propertyId,
+            Pageable pageable) {
+        return ResponseEntity.ok(interactionService.getPropertyInteractions(propertyId, pageable));
     }
 }

@@ -33,8 +33,10 @@ public class AuditAspect {
     private final AuditLogRepository auditLogRepository;
     private final ObjectMapper objectMapper;
     private final UserRepository userRepository;
+    private final com.example.datn_realeaste_crm.security.crypto.DeterministicHasher deterministicHasher;
 
-    
+
+
     @Pointcut("@annotation(Auditable)")
     public void auditableMethod() {
     }
@@ -115,7 +117,9 @@ public class AuditAspect {
             } else if (principal instanceof String) {
                 // Lấy username từ principal và tìm User tương ứng
                 String username = (String) principal;
-                return userRepository.findByEmail(username)
+                String normalized = username == null ? null : username.trim().toLowerCase(java.util.Locale.ROOT);
+                byte[] emailHash = deterministicHasher.emailHash(normalized);
+                return userRepository.findByEmailHash(emailHash)
                         .orElse(null);
             }
         }

@@ -81,7 +81,7 @@ public class SecurityConfig {
                         .hasAnyRole(RoleEnum.ADMIN.name(), RoleEnum.REVIEWER.name())
 
                         // Property Owner access
-                        .requestMatchers("/properties/owned/**").hasAnyAuthority(RoleEnum.PROPERTY_OWNER.name())
+                        .requestMatchers("/properties/owned/**").hasRole(RoleEnum.PROPERTY_OWNER.name())
                         .requestMatchers("/notifications/property-owner/**").hasRole(RoleEnum.PROPERTY_OWNER.name())
 
                         // Consultant access

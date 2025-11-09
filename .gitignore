@@ -18,6 +18,9 @@ target/
 *.iws
 *.iml
 *.ipr
+# Spring configuration
+src/main/resources/application.yml
+
 
 ### NetBeans ###
 /nbproject/private/
@@ -31,3 +34,7 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Firebase ###
+**/datn-2ea3f-firebase-adminsdk-fbsvc-ac9cbda277.json
+google-services.json

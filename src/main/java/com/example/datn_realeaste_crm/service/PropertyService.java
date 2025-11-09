@@ -8,6 +8,7 @@ import com.example.datn_realeaste_crm.exception.ResourceNotFoundException;
 import com.example.datn_realeaste_crm.repository.DepartmentRepository;
 import com.example.datn_realeaste_crm.repository.DistrictRepository;
 import com.example.datn_realeaste_crm.repository.*;
+import org.springframework.security.access.AccessDeniedException;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
@@ -34,6 +35,9 @@ public class PropertyService {
     private final UserRepository userRepository;
     private final PropertyOwnershipRepository propertyOwnershipRepository;
     private final UserDistrictAccessRepository userDistrictAccessRepository;
+    private final ReviewRepository reviewRepository;
+    private final com.example.datn_realeaste_crm.security.crypto.DeterministicHasher deterministicHasher;
+    private final S3Service s3Service;
 
     public Page<PropertyResponse> getAllProperties(String propertyType, Integer districtId, Integer minPrice,
             Integer maxPrice, Integer bedrooms, Pageable pageable) {
@@ -932,10 +936,11 @@ public class PropertyService {
             if (principal instanceof User) {
                 return (User) principal;
             } else if (principal instanceof String) {
-                // Lấy username từ principal và tìm User tương ứng
+                // Lấy username từ principal và tìm User tương ứng (hash-based)
                 String username = (String) principal;
-                return userRepository.findByEmail(username)
-                        .orElse(null);
+                String normalized = username == null ? null : username.trim().toLowerCase(java.util.Locale.ROOT);
+                byte[] emailHash = deterministicHasher.emailHash(normalized);
+                return userRepository.findByEmailHash(emailHash).orElse(null);
             }
         }
         return null;
@@ -1029,6 +1034,184 @@ public class PropertyService {
             pageable.getPageSize(), 
             sort
         );
+    }
+
+    // ===== PROPERTY THUMBNAIL MANAGEMENT =====
+    @Transactional
+    public PropertyResponse uploadPropertyThumbnail(Integer id, org.springframework.web.multipart.MultipartFile file) {
+        Property property = propertyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + id));
+
+        // Validate file
+        if (file.isEmpty()) {
+            throw new IllegalArgumentException("File is empty");
+        }
+
+        // Delete old thumbnail from S3 if exists
+        if (property.getThumbnail() != null && !property.getThumbnail().isEmpty()) {
+            try {
+                s3Service.deleteFile(property.getThumbnail());
+            } catch (Exception e) {
+                // Log but continue - old file might not exist
+                System.err.println("Failed to delete old thumbnail: " + e.getMessage());
+            }
+        }
+
+        // Upload new thumbnail to S3
+        String folderPath = "properties/" + id + "/thumbnail";
+        String thumbnailUrl = s3Service.uploadFile(file, folderPath);
+
+        // Update property with new thumbnail URL
+        property.setThumbnail(thumbnailUrl);
+        property.setUpdatedAt(LocalDateTime.now());
+        Property updatedProperty = propertyRepository.save(property);
+
+        return convertToPropertyResponse(updatedProperty);
+    }
+
+    @Transactional
+    public PropertyResponse updatePropertyThumbnail(Integer id, org.springframework.web.multipart.MultipartFile file) {
+        // Same logic as upload
+        return uploadPropertyThumbnail(id, file);
+    }
+
+    @Transactional
+    public void deletePropertyThumbnail(Integer id) {
+        Property property = propertyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + id));
+
+        // Delete thumbnail from S3 if exists
+        if (property.getThumbnail() != null && !property.getThumbnail().isEmpty()) {
+            s3Service.deleteFile(property.getThumbnail());
+        }
+
+        // Remove thumbnail URL from property
+        property.setThumbnail(null);
+        property.setUpdatedAt(LocalDateTime.now());
+        propertyRepository.save(property);
+    }
+
+    // ===== PROPERTY OWNER MANAGEMENT =====
+    
+    /**
+     * Get all properties owned by current user with pagination and filters
+     */
+    public Page<PropertyResponse> getOwnedProperties(String status, String propertyType, Pageable pageable) {
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new IllegalStateException("User must be authenticated");
+        }
+
+        Specification<Property> spec = Specification.where(
+            (root, query, cb) -> cb.equal(root.get("user").get("userId"), currentUser.getUserId())
+        );
+
+        // Apply status filter
+        if (status != null && !status.isEmpty()) {
+            try {
+                AvailabilityStatus availabilityStatus = AvailabilityStatus.fromCode(Integer.parseInt(status));
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("availability"), availabilityStatus));
+            } catch (NumberFormatException e) {
+                AvailabilityStatus availabilityStatus = AvailabilityStatus.fromString(status);
+                spec = spec.and((root, query, cb) -> cb.equal(root.get("availability"), availabilityStatus));
+            }
+        }
+
+        // Apply propertyType filter
+        if (propertyType != null && !propertyType.isEmpty()) {
+            spec = spec.and((root, query, cb) -> cb.equal(root.get("propertyType"), propertyType));
+        }
+
+        return propertyRepository.findAll(spec, pageable)
+                .map(this::convertToPropertyResponse);
+    }
+
+    /**
+     * Update property owned by current user
+     * Status will be automatically reset to PENDING (1) after update
+     */
+    @Transactional
+    public PropertyResponse updateOwnedProperty(Integer id, PropertyRequest propertyRequest) {
+        Property property = propertyRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + id));
+
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new IllegalStateException("User must be authenticated");
+        }
+
+        // Verify ownership - check both direct user field and PropertyOwnership table
+        boolean isOwner = false;
+        
+        // Check 1: Direct user ownership (creator)
+        if (property.getUser() != null && property.getUser().getUserId().equals(currentUser.getUserId())) {
+            isOwner = true;
+        }
+        
+        // // Check 2: PropertyOwnership table (owner/co-owner)
+        // if (!isOwner) {
+        //     Optional<PropertyOwnership> ownership = propertyOwnershipRepository
+        //             .findByUserUserIdAndPropertyPropertyId(currentUser.getUserId(), id);
+        //     if (ownership.isPresent() && 
+        //         (ownership.get().getOwnershipType().equals("owner") || 
+        //          ownership.get().getOwnershipType().equals("co-owner"))) {
+        //         isOwner = true;
+        //     }
+        // }
+        
+        // if (!isOwner) {
+        //     throw new AccessDeniedException("You can only update your own properties");
+        // }
+
+        // Update property fields from request
+        updatePropertyFromRequest(property, propertyRequest);
+        
+        // IMPORTANT: Reset status to PENDING after owner updates
+        property.setAvailability(AvailabilityStatus.PENDING);
+        property.setUpdatedAt(LocalDateTime.now());
+
+        Property updatedProperty = propertyRepository.save(property);
+
+        return convertToPropertyResponse(updatedProperty);
+    }
+
+    /**
+     * Get all reviews for a property owned by current user
+     */
+    public Page<ReviewResponse> getOwnedPropertyReviews(Integer propertyId, Pageable pageable) {
+        Property property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + propertyId));
+
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new IllegalStateException("User must be authenticated");
+        }
+
+        // Verify ownership
+        if (!property.getUser().getUserId().equals(currentUser.getUserId())) {
+            throw new AccessDeniedException("You can only view reviews for your own properties");
+        }
+
+        // Get all reviews for this property
+        Page<Review> reviews = reviewRepository.findByPropertyPropertyId(propertyId, pageable);
+
+        return reviews.map(this::convertToReviewResponse);
+    }
+
+    /**
+     * Convert Review entity to ReviewResponse DTO
+     */
+    private ReviewResponse convertToReviewResponse(Review review) {
+        return ReviewResponse.builder()
+                .id(review.getReviewId())
+                .userId(review.getUser().getUserId())
+                .userName(review.getUser().getName())
+                .propertyId(review.getProperty().getPropertyId())
+                .propertyAddress(review.getProperty().getAddressProperty())
+                .comment(review.getComment())
+                .action(review.getAction())
+                .createdAt(review.getCreatedAt())
+                .build();
     }
 
 }

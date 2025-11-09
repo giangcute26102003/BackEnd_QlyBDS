@@ -31,6 +31,9 @@ public class Review {
     @Column(name = "comment", columnDefinition = "TEXT")
     private String comment;
     
+    @Column(name = "action", length = 50)
+    private String action;
+    
     @CreationTimestamp
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;

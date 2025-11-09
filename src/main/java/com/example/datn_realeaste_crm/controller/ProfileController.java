@@ -36,6 +36,7 @@ public class ProfileController {
     private final UserService userService;
     private final UserRepository userRepository;
     private final DashboardService dashboardService;
+    private final com.example.datn_realeaste_crm.security.crypto.DeterministicHasher deterministicHasher;
 
     /**
      * Lấy thông tin profile của user hiện tại
@@ -170,7 +171,9 @@ public class ProfileController {
             throw new ResourceNotFoundException("No username found in authentication");
         }
         
-        User user = userRepository.findByEmail(email)
+        String normalizedEmail = email.trim().toLowerCase(java.util.Locale.ROOT);
+        byte[] emailHash = deterministicHasher.emailHash(normalizedEmail);
+        User user = userRepository.findByEmailHash(emailHash)
                 .orElseThrow(() -> {
                     log.error("User not found with email: {}", email);
                     return new ResourceNotFoundException("User not found with email: " + email);

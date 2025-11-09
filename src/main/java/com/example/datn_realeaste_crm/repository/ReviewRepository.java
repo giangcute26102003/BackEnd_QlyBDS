@@ -15,6 +15,9 @@ public interface ReviewRepository extends JpaRepository<Review, Integer> {
     
     Page<Review> findByUserUserId(Integer userId, Pageable pageable);
     
+    Page<Review> findByUserUserIdAndPropertyPropertyId(Integer userId, Integer propertyId, Pageable pageable);
+    
     List<Review> findByUserUserIdAndPropertyPropertyId(Integer userId, Integer propertyId);
+    
     long countByUserUserId(Integer userId);
 }

@@ -14,4 +14,11 @@ public interface InteractionRepository extends JpaRepository<Interaction, Intege
     Page<Interaction> findByPropertyPropertyId(Integer propertyId, Pageable pageable);
     
     Page<Interaction> findByCustomerCustomerIdAndPropertyPropertyId(Integer customerId, Integer propertyId, Pageable pageable);
+    
+    // Find interactions by user (through customer)
+    Page<Interaction> findByCustomer_User_UserId(Integer userId, Pageable pageable);
+    
+    Page<Interaction> findByCustomer_User_UserIdAndPropertyPropertyId(Integer userId, Integer propertyId, Pageable pageable);
+    
+    long countByCustomer_User_UserId(Integer userId);
 }

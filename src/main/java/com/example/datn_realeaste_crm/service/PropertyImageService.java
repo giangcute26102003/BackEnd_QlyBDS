@@ -59,6 +59,39 @@ public class PropertyImageService {
         return convertToPropertyImageResponse(savedImage);
     }
     
+    /**
+     * Add multiple property images by uploading files at once
+     */
+    @Transactional
+    public List<PropertyImageResponse> addPropertyImagesBulk(Integer propertyId, List<MultipartFile> files) {
+        Property property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + propertyId));
+
+        String folderPath = "properties/" + propertyId + "/images";
+        
+        List<PropertyImage> propertyImages = files.stream()
+                .map(file -> {
+                    // Upload each file to S3
+                    String s3Url = s3Service.uploadFile(file, folderPath);
+                    
+                    return PropertyImage.builder()
+                            .property(property)
+                            .imageUrl(s3Url)
+                            .originalFilename(file.getOriginalFilename())
+                            .fileSize(file.getSize())
+                            .contentType(file.getContentType())
+                            .build();
+                })
+                .collect(Collectors.toList());
+
+        List<PropertyImage> savedImages = propertyImageRepository.saveAll(propertyImages);
+        log.info("Added {} property images by file upload for property ID: {}", savedImages.size(), propertyId);
+
+        return savedImages.stream()
+                .map(this::convertToPropertyImageResponse)
+                .collect(Collectors.toList());
+    }
+    
     @Transactional
     public PropertyImageResponse addPropertyImageByUrl(Integer propertyId, PropertyImageRequest request) {
         Property property = propertyRepository.findById(propertyId)
@@ -67,11 +100,38 @@ public class PropertyImageService {
         PropertyImage propertyImage = PropertyImage.builder()
                 .property(property)
                 .imageUrl(request.getImageUrl())
+                .originalFilename(request.getOriginalFilename())
                 .build();
 
         PropertyImage savedImage = propertyImageRepository.save(propertyImage);
+        log.info("Property image added by URL for property ID: {}, Image URL: {}", propertyId, request.getImageUrl());
 
         return convertToPropertyImageResponse(savedImage);
+    }
+    
+    /**
+     * Add multiple property images by URLs at once
+     */
+    @Transactional
+    public List<PropertyImageResponse> addPropertyImagesByUrls(Integer propertyId, 
+            com.example.datn_realeaste_crm.dto.request.PropertyImageBulkRequest request) {
+        Property property = propertyRepository.findById(propertyId)
+                .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + propertyId));
+
+        List<PropertyImage> propertyImages = request.getImages().stream()
+                .map(imageData -> PropertyImage.builder()
+                        .property(property)
+                        .imageUrl(imageData.getImageUrl())
+                        .originalFilename(imageData.getOriginalFilename())
+                        .build())
+                .collect(Collectors.toList());
+
+        List<PropertyImage> savedImages = propertyImageRepository.saveAll(propertyImages);
+        log.info("Added {} property images by URLs for property ID: {}", savedImages.size(), propertyId);
+
+        return savedImages.stream()
+                .map(this::convertToPropertyImageResponse)
+                .collect(Collectors.toList());
     }
 
     @Transactional

@@ -14,9 +14,14 @@ import java.util.Optional;
 @Repository
 public interface CustomerRepository extends JpaRepository<Customer, Integer> {
     
-    boolean existsByEmail(String email);
+    // Hash-based lookups for encrypted fields
+    Optional<Customer> findByEmailHash(byte[] emailHash);
     
-    boolean existsByPhoneNumber(String phoneNumber);
+    Optional<Customer> findByPhoneHash(byte[] phoneHash);
+    
+    boolean existsByEmailHash(byte[] emailHash);
+    
+    boolean existsByPhoneHash(byte[] phoneHash);
     
     @Query("SELECT c FROM Customer c JOIN FETCH c.user WHERE c.user.userId = :userId")
     Page<Customer> findByUserUserId(@Param("userId") Integer userId, Pageable pageable);

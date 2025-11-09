@@ -28,7 +28,7 @@ public class PropertyOwnershipController {
     }
     
     @GetMapping("/property/{propertyId}")
-    @PreAuthorize("hasRole('ROLE_ADMIN') or @propertyAuthorizationService.canAccessProperty(authentication, #propertyId)")
+    @PreAuthorize("hasRole('ROLE_ADMIN') or @propertyAuthorizationService.canAccessProperty(#propertyId)")
     public ResponseEntity<List<PropertyOwnershipResponse>> getPropertyOwnerships(@PathVariable Integer propertyId) {
         return ResponseEntity.ok(propertyOwnershipService.getPropertyOwnerships(propertyId));
     }

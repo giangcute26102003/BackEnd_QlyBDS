@@ -41,6 +41,16 @@ public class UserService {
     private final PasswordEncoder passwordEncoder;
     private final TokenRepository tokenRepository;
     private final DepartmentAuthorizationService departmentAuthorizationService;
+    private final com.example.datn_realeaste_crm.security.crypto.DeterministicHasher deterministicHasher;
+
+    // Normalization helpers for consistent hashing
+    private String normalizeEmail(String email) {
+        return email == null ? null : email.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private String normalizePhone(String phone) {
+        return phone == null ? null : phone.replaceAll("\\D", ""); // Keep digits only
+    }
 
     public Page<UserResponse> getAllUsers(Integer departmentId, Boolean isActive, Pageable pageable) {
         Specification<User> spec = Specification.where(null);
@@ -87,9 +97,13 @@ public class UserService {
                         cb.like(cb.lower(root.get("name")), "%" + request.getName().toLowerCase() + "%"));
                 }
                 
+                // Email search: only exact match supported due to encryption
+                // For partial search, need to implement client-side filtering after decryption
                 if (request.getEmail() != null && !request.getEmail().trim().isEmpty()) {
+                    String normalizedEmail = normalizeEmail(request.getEmail());
+                    byte[] emailHash = deterministicHasher.emailHash(normalizedEmail);
                     spec = spec.and((root, query, cb) -> 
-                        cb.like(cb.lower(root.get("email")), "%" + request.getEmail().toLowerCase() + "%"));
+                        cb.equal(root.get("emailHash"), emailHash));
                 }
                 
                 if (request.getDepartmentId() != null) {
@@ -209,16 +223,30 @@ public class UserService {
 
     @Transactional
     public UserResponse createUser(UserCreateRequest request) {
-        // Check if email already exists
-        if (userRepository.existsByEmail(request.getEmail())) {
+        // Normalize and check if email already exists
+        String normalizedEmail = normalizeEmail(request.getEmail());
+        byte[] emailHash = deterministicHasher.emailHash(normalizedEmail);
+        
+        if (userRepository.existsByEmailHash(emailHash)) {
             throw new ResourceAlreadyExistsException("Email already in use: " + request.getEmail());
         }
 
         User user = new User();
         user.setName(request.getName());
-        user.setEmail(request.getEmail());
+        
+        // Set encrypted email with hash
+        user.setEmail(normalizedEmail);
+        user.setEmailHash(emailHash);
+        
         user.setPassword(passwordEncoder.encode(request.getPassword()));
-        user.setPhoneNumber(request.getPhoneNumber());
+        
+        // Set encrypted phone with hash
+        if (request.getPhoneNumber() != null) {
+            String normalizedPhone = normalizePhone(request.getPhoneNumber());
+            user.setPhoneNumber(normalizedPhone);
+            user.setPhoneHash(deterministicHasher.phoneHash(normalizedPhone));
+        }
+        
         user.setAddress(request.getAddress());
         user.setDob(request.getDob());
         user.setIsActive(true);
@@ -257,17 +285,22 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + id));
 
         // Check if new email is already used by another user
-        if (request.getEmail() != null && !request.getEmail().equals(user.getEmail()) &&
-                userRepository.existsByEmail(request.getEmail())) {
-            throw new ResourceAlreadyExistsException("Email already in use: " + request.getEmail());
+        if (request.getEmail() != null) {
+            String normalizedNewEmail = normalizeEmail(request.getEmail());
+            String currentNormalizedEmail = normalizeEmail(user.getEmail());
+            
+            if (!normalizedNewEmail.equals(currentNormalizedEmail)) {
+                byte[] newEmailHash = deterministicHasher.emailHash(normalizedNewEmail);
+                if (userRepository.existsByEmailHash(newEmailHash)) {
+                    throw new ResourceAlreadyExistsException("Email already in use: " + request.getEmail());
+                }
+                user.setEmail(normalizedNewEmail);
+                user.setEmailHash(newEmailHash);
+            }
         }
 
         if (request.getName() != null) {
             user.setName(request.getName());
-        }
-
-        if (request.getEmail() != null) {
-            user.setEmail(request.getEmail());
         }
 
         if (request.getPassword() != null) {
@@ -275,7 +308,9 @@ public class UserService {
         }
 
         if (request.getPhoneNumber() != null) {
-            user.setPhoneNumber(request.getPhoneNumber());
+            String normalizedPhone = normalizePhone(request.getPhoneNumber());
+            user.setPhoneNumber(normalizedPhone);
+            user.setPhoneHash(deterministicHasher.phoneHash(normalizedPhone));
         }
 
         if (request.getAddress() != null) {
@@ -461,7 +496,10 @@ public class UserService {
      * Lấy danh sách role names của user theo email cho việc hiển thị trên màn hình login
      */
     public List<String> getUserRoles(String email) {
-        User user = userRepository.findByEmail(email)
+        String normalizedEmail = normalizeEmail(email);
+        byte[] emailHash = deterministicHasher.emailHash(normalizedEmail);
+        
+        User user = userRepository.findByEmailHash(emailHash)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
 
         return user.getUserRoles().stream()
@@ -520,20 +558,28 @@ public class UserService {
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
 
         // Kiểm tra email mới có bị trùng không
-        if (request.getEmail() != null && !request.getEmail().equals(user.getEmail()) &&
-                userRepository.existsByEmail(request.getEmail())) {
-            throw new ResourceAlreadyExistsException("Email already in use: " + request.getEmail());
+        if (request.getEmail() != null) {
+            String normalizedNewEmail = normalizeEmail(request.getEmail());
+            String currentNormalizedEmail = normalizeEmail(user.getEmail());
+            
+            if (!normalizedNewEmail.equals(currentNormalizedEmail)) {
+                byte[] newEmailHash = deterministicHasher.emailHash(normalizedNewEmail);
+                if (userRepository.existsByEmailHash(newEmailHash)) {
+                    throw new ResourceAlreadyExistsException("Email already in use: " + request.getEmail());
+                }
+                user.setEmail(normalizedNewEmail);
+                user.setEmailHash(newEmailHash);
+            }
         }
 
         // Cập nhật các trường
         if (request.getName() != null) {
             user.setName(request.getName());
         }
-        if (request.getEmail() != null) {
-            user.setEmail(request.getEmail());
-        }
         if (request.getPhoneNumber() != null) {
-            user.setPhoneNumber(request.getPhoneNumber());
+            String normalizedPhone = normalizePhone(request.getPhoneNumber());
+            user.setPhoneNumber(normalizedPhone);
+            user.setPhoneHash(deterministicHasher.phoneHash(normalizedPhone));
         }
         if (request.getAddress() != null) {
             user.setAddress(request.getAddress());

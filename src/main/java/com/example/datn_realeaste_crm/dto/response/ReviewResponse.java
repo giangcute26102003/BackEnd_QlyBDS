@@ -16,6 +16,7 @@ public class ReviewResponse {
     private Integer propertyId;
     private String propertyAddress;
     private String comment;
+    private String action;
     
     @JsonFormat(pattern = "yyyy-MM-dd HH:mm:ss")
     private LocalDateTime createdAt;

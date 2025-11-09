@@ -2,6 +2,7 @@ package com.example.datn_realeaste_crm.controller;
 
 
 import com.example.datn_realeaste_crm.audit.Auditable;
+import com.example.datn_realeaste_crm.dto.request.PropertyImageBulkRequest;
 import com.example.datn_realeaste_crm.dto.request.PropertyImageRequest;
 import com.example.datn_realeaste_crm.dto.response.PropertyImageResponse;
 import com.example.datn_realeaste_crm.service.PropertyImageService;
@@ -29,7 +30,7 @@ public class PropertyImageController {
     }
     
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(authentication, #propertyId)")
+//    @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(authentication, #propertyId)")
     @Auditable(action = "ADD_PROPERTY_IMAGE", entityType = "PropertyImage", logResult = true)
     public ResponseEntity<PropertyImageResponse> addPropertyImage(
             @PathVariable Integer propertyId,
@@ -37,8 +38,17 @@ public class PropertyImageController {
         return new ResponseEntity<>(propertyImageService.addPropertyImage(propertyId, file), HttpStatus.CREATED);
     }
     
+    @PostMapping(value = "/bulk", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+//    @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(authentication, #propertyId)")
+    @Auditable(action = "ADD_PROPERTY_IMAGES_BULK", entityType = "PropertyImage", logResult = true)
+    public ResponseEntity<List<PropertyImageResponse>> addPropertyImagesBulk(
+            @PathVariable Integer propertyId,
+            @RequestParam("files") List<MultipartFile> files) {
+        return new ResponseEntity<>(propertyImageService.addPropertyImagesBulk(propertyId, files), HttpStatus.CREATED);
+    }
+    
     @PostMapping("/url")
-    @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(authentication, #propertyId)")
+//    @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(authentication, #propertyId)")
     @Auditable(action = "ADD_PROPERTY_IMAGE_URL", entityType = "PropertyImage", logResult = true)
     public ResponseEntity<PropertyImageResponse> addPropertyImageByUrl(
             @PathVariable Integer propertyId,
@@ -46,8 +56,17 @@ public class PropertyImageController {
         return new ResponseEntity<>(propertyImageService.addPropertyImageByUrl(propertyId, request), HttpStatus.CREATED);
     }
     
+    @PostMapping("/bulk-url")
+//    @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(authentication, #propertyId)")
+    @Auditable(action = "ADD_PROPERTY_IMAGES_BULK_URL", entityType = "PropertyImage", logResult = true)
+    public ResponseEntity<List<PropertyImageResponse>> addPropertyImagesByUrls(
+            @PathVariable Integer propertyId,
+            @Valid @RequestBody PropertyImageBulkRequest request) {
+        return new ResponseEntity<>(propertyImageService.addPropertyImagesByUrls(propertyId, request), HttpStatus.CREATED);
+    }
+    
     @DeleteMapping("/{imageId}")
-    @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(authentication, #propertyId)")
+    @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(#propertyId)")
     @Auditable(action = "DELETE_PROPERTY_IMAGE", entityType = "PropertyImage", entityIdParam = "imageId")
     public ResponseEntity<Void> deletePropertyImage(
             @PathVariable Integer propertyId,
@@ -57,7 +76,7 @@ public class PropertyImageController {
     }
     
     @PutMapping(value = "/{imageId}", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(authentication, #propertyId)")
+    @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(#propertyId)")
     @Auditable(action = "UPDATE_PROPERTY_IMAGE", entityType = "PropertyImage", entityIdParam = "imageId")
     public ResponseEntity<PropertyImageResponse> updatePropertyImage(
             @PathVariable Integer propertyId,
@@ -67,7 +86,7 @@ public class PropertyImageController {
     }
     
     @PutMapping("/{imageId}/url")
-    @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(authentication, #propertyId)")
+    @PreAuthorize("hasAuthority('property_update') or @propertyAuthorizationService.isPropertyOwner(#propertyId)")
     @Auditable(action = "UPDATE_PROPERTY_IMAGE_URL", entityType = "PropertyImage", entityIdParam = "imageId")
     public ResponseEntity<PropertyImageResponse> updatePropertyImageByUrl(
             @PathVariable Integer propertyId,

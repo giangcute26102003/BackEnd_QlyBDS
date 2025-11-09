@@ -34,29 +34,34 @@ public class S3Service {
                 throw new IllegalArgumentException("File is empty");
             }
 
-            // Validate file type (only images)
-            String contentType = file.getContentType();
+            // Get and validate content type
+            String contentType = determineContentType(file);
             if (contentType == null || !contentType.startsWith("image/")) {
-                throw new IllegalArgumentException("Only image files are allowed");
+                throw new IllegalArgumentException("Only image files are allowed. Detected type: " + contentType);
             }
 
             // Generate unique file name
             String fileName = generateFileName(file.getOriginalFilename());
             String key = folderPath + "/" + fileName;
 
-            // Upload file to S3
+            log.debug("Uploading file: {} with Content-Type: {} to S3 key: {}", 
+                    file.getOriginalFilename(), contentType, key);
+
+            // Upload file to S3 with proper content type and metadata
             PutObjectRequest putObjectRequest = PutObjectRequest.builder()
                     .bucket(bucketName)
                     .key(key)
                     .contentType(contentType)
                     .contentLength(file.getSize())
+                    .contentDisposition("inline") // Display in browser instead of download
+                    .cacheControl("max-age=31536000") // Cache for 1 year
                     .build();
 
             s3Client.putObject(putObjectRequest, RequestBody.fromInputStream(file.getInputStream(), file.getSize()));
 
             // Return the public URL
             String fileUrl = String.format("https://%s.s3.%s.amazonaws.com/%s", bucketName, region, key);
-            log.info("File uploaded successfully: {}", fileUrl);
+            log.info("File uploaded successfully: {} with Content-Type: {}", fileUrl, contentType);
             
             return fileUrl;
 
@@ -66,6 +71,65 @@ public class S3Service {
         } catch (S3Exception e) {
             log.error("S3 error uploading file: {}", e.getMessage());
             throw new RuntimeException("S3 error uploading file", e);
+        }
+    }
+    
+    /**
+     * Determine content type from file with fallback to extension-based detection
+     */
+    private String determineContentType(MultipartFile file) {
+        // First, try to get content type from the file
+        String contentType = file.getContentType();
+        
+        // If content type is missing or generic, detect from file extension
+        if (contentType == null || contentType.equals("application/octet-stream") || contentType.isEmpty()) {
+            String filename = file.getOriginalFilename();
+            if (filename != null) {
+                contentType = getContentTypeFromExtension(filename.toLowerCase());
+            }
+        }
+        
+        // Normalize content type
+        if (contentType != null) {
+            contentType = contentType.toLowerCase().trim();
+        }
+        
+        log.debug("Determined Content-Type: {} for file: {}", contentType, file.getOriginalFilename());
+        return contentType;
+    }
+    
+    /**
+     * Get content type based on file extension
+     */
+    private String getContentTypeFromExtension(String filename) {
+        if (filename == null || !filename.contains(".")) {
+            return "application/octet-stream";
+        }
+        
+        String extension = filename.substring(filename.lastIndexOf(".") + 1).toLowerCase();
+        
+        switch (extension) {
+            case "jpg":
+            case "jpeg":
+                return "image/jpeg";
+            case "png":
+                return "image/png";
+            case "gif":
+                return "image/gif";
+            case "bmp":
+                return "image/bmp";
+            case "webp":
+                return "image/webp";
+            case "svg":
+                return "image/svg+xml";
+            case "ico":
+                return "image/x-icon";
+            case "tif":
+            case "tiff":
+                return "image/tiff";
+            default:
+                log.warn("Unknown image extension: {}, defaulting to application/octet-stream", extension);
+                return "application/octet-stream";
         }
     }
 

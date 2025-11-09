@@ -20,6 +20,7 @@ import org.springframework.stereotype.Service;
 public class DepartmentAuthorizationService {
 
     private final UserRepository userRepository;
+    private final com.example.datn_realeaste_crm.security.crypto.DeterministicHasher deterministicHasher;
 
     /**
      * Kiểm tra xem user hiện tại có quyền truy cập user khác không
@@ -214,8 +215,10 @@ public class DepartmentAuthorizationService {
         if (email == null || email.trim().isEmpty()) {
             throw new ResourceNotFoundException("No username found in authentication");
         }
+        String normalizedEmail = email.trim().toLowerCase(java.util.Locale.ROOT);
+        byte[] emailHash = deterministicHasher.emailHash(normalizedEmail);
         
-        User user = userRepository.findByEmail(email)
+        User user = userRepository.findByEmailHash(emailHash)
                 .orElseThrow(() -> new ResourceNotFoundException("User not found with email: " + email));
         
         if (!user.getIsActive()) {
