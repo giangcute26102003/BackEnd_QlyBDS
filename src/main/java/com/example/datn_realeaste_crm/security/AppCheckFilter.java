@@ -98,7 +98,7 @@ public class AppCheckFilter extends OncePerRequestFilter {
                 .anyMatch(path::startsWith);
         
         if (shouldSkip) {
-            logger.debug("⏭️ Skipping App Check for public endpoint: {}", path);
+            logger.debug("Skipping App Check for public endpoint: {}", path);
         }
         
         return !shouldSkip;
