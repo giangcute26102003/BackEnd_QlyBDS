@@ -30,7 +30,7 @@ import java.util.Map;
 @RestController
 @RequestMapping("/manager")
 @RequiredArgsConstructor
-@PreAuthorize("hasRole('MANAGER')")
+@PreAuthorize("hasAuthority('customer_create')")
 @Slf4j
 public class ManagerController {
 

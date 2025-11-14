@@ -42,26 +42,38 @@ public class AuthService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         User user = (User) authentication.getPrincipal();
 
-        // 2. Kiểm tra xem user có được cấp selectedRole hay không
-        Optional<UserRole> userRole = userRoleRepository.findByUserUserIdAndRoleRoleId(
-                user.getUserId(), getRoleIdByName(loginRequest.getSelectedRole()));
-        
-        if (userRole.isEmpty()) {
-            throw new BadCredentialsException("User does not have the selected role: " + loginRequest.getSelectedRole());
+        // 2. Xác định role sẽ sử dụng
+        String roleToUse;
+        if (loginRequest.getSelectedRole() != null && !loginRequest.getSelectedRole().trim().isEmpty()) {
+            // Nếu có truyền selectedRole, kiểm tra xem user có role đó không
+            Optional<UserRole> userRole = userRoleRepository.findByUserUserIdAndRoleRoleId(
+                    user.getUserId(), getRoleIdByName(loginRequest.getSelectedRole()));
+            
+            if (userRole.isEmpty()) {
+                throw new BadCredentialsException("User does not have the selected role: " + loginRequest.getSelectedRole());
+            }
+            roleToUse = loginRequest.getSelectedRole();
+        } else {
+            // Nếu không truyền selectedRole, tự động chọn role đầu tiên của user
+            roleToUse = userRoleRepository.findByUserUserId(user.getUserId())
+                    .stream()
+                    .findFirst()
+                    .map(ur -> ur.getRole().getRoleName())
+                    .orElseThrow(() -> new BadCredentialsException("User does not have any role assigned"));
         }
 
         // 3. Truy xuất danh sách permission tương ứng với role
-        Set<String> permissions = getPermissionsByRole(loginRequest.getSelectedRole());
+        Set<String> permissions = getPermissionsByRole(roleToUse);
 
         // 4. Sinh JWT token chứa username, role và permissions
-        String accessToken = tokenProvider.generateAccessToken(user.getEmail(), loginRequest.getSelectedRole(), permissions);
-        String refreshToken = tokenProvider.generateRefreshToken(user, loginRequest.getSelectedRole());
+        String accessToken = tokenProvider.generateAccessToken(user.getEmail(), roleToUse, permissions);
+        String refreshToken = tokenProvider.generateRefreshToken(user, roleToUse);
 
         return AuthResponse.builder()
                 .userId(user.getUserId())
                 .email(user.getEmail())
                 .name(user.getName())
-                .selectedRole(loginRequest.getSelectedRole())
+                .selectedRole(roleToUse)
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .build();

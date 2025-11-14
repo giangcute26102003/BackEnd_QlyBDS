@@ -101,7 +101,7 @@ public class AppCheckFilter extends OncePerRequestFilter {
             logger.debug("⏭️ Skipping App Check for public endpoint: {}", path);
         }
         
-        return shouldSkip;
+        return !shouldSkip;
     }
 
     /**
