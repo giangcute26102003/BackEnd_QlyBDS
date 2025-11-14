@@ -51,15 +51,15 @@ public class AppCheckFilter extends OncePerRequestFilter {
 
         // Nếu thiếu token
         if (appCheckToken == null || appCheckToken.trim().isEmpty()) {
-            logger.warn("❌ Request thiếu App Check token - Path: {}", requestPath);
+            logger.warn("Request thiếu App Check token - Path: {}", requestPath);
             sendUnauthorizedResponse(response, "Missing App Check token");
             return;
         }
 
         // Kiểm tra xem Firebase đã được khởi tạo chưa
         if (FirebaseApp.getApps().isEmpty()) {
-            logger.error("❌ Firebase chưa được khởi tạo - REJECT request - Path: {}", requestPath);
-            logger.error("   Vui lòng copy file firebase-service-account.json vào src/main/resources/");
+            logger.error("Firebase chưa được khởi tạo - REJECT request - Path: {}", requestPath);
+            logger.error("Vui lòng copy file firebase-service-account.json vào src/main/resources/");
             sendUnauthorizedResponse(response, "App Check not configured");
             return;
         }
@@ -72,16 +72,16 @@ public class AppCheckFilter extends OncePerRequestFilter {
             
             if (isValid) {
                 // ✅ Token hợp lệ - cho phép request tiếp tục
-                logger.debug("✅ App Check token hợp lệ - Path: {}", requestPath);
+                logger.debug("App Check token hợp lệ - Path: {}", requestPath);
                 filterChain.doFilter(request, response);
             } else {
-                logger.error("❌ App Check token không hợp lệ - Path: {}", requestPath);
+                logger.error(" App Check token không hợp lệ - Path: {}", requestPath);
                 sendUnauthorizedResponse(response, "Invalid App Check token");
             }
 
         } catch (Exception e) {
             // ❌ Lỗi khi verify token
-            logger.error("❌ App Check verification thất bại - Path: {}, Error: {}", 
+            logger.error("App Check verification thất bại - Path: {}, Error: {}",
                     requestPath, e.getMessage());
             sendUnauthorizedResponse(response, "Invalid App Check token");
         }
@@ -101,7 +101,7 @@ public class AppCheckFilter extends OncePerRequestFilter {
             logger.debug("⏭️ Skipping App Check for public endpoint: {}", path);
         }
         
-        return shouldSkip;
+        return !shouldSkip;
     }
 
     /**

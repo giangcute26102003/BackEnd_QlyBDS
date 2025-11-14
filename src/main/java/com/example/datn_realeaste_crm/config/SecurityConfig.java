@@ -96,7 +96,7 @@ public class SecurityConfig {
                         // Default - authenticated
                         .anyRequest().authenticated())
                 .authenticationProvider(authenticationProvider())
-                .addFilterBefore(appCheckFilter, UsernamePasswordAuthenticationFilter.class)
+//                .addFilterBefore(appCheckFilter, UsernamePasswordAuthenticationFilter.class)
                 .addFilterBefore(jwtTokenFilter, UsernamePasswordAuthenticationFilter.class);
 
         return http.build();
