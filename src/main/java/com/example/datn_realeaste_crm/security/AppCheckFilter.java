@@ -71,7 +71,7 @@ public class AppCheckFilter extends OncePerRequestFilter {
             boolean isValid = verificationService.verifyToken(appCheckToken);
             
             if (isValid) {
-                // ✅ Token hợp lệ - cho phép request tiếp tục
+                //  Token hợp lệ - cho phép request tiếp tục
                 logger.debug("App Check token hợp lệ - Path: {}", requestPath);
                 filterChain.doFilter(request, response);
             } else {
@@ -80,7 +80,7 @@ public class AppCheckFilter extends OncePerRequestFilter {
             }
 
         } catch (Exception e) {
-            // ❌ Lỗi khi verify token
+            // Lỗi khi verify token
             logger.error("App Check verification thất bại - Path: {}, Error: {}",
                     requestPath, e.getMessage());
             sendUnauthorizedResponse(response, "Invalid App Check token");
