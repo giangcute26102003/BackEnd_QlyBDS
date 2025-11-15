@@ -1,0 +1,26 @@
+name: Deploy Spring Boot
+
+on:
+  push:
+    branches: [ "test-deploy" ]
+
+jobs:
+  build:
+    runs-on: self-hosted
+
+    steps:
+      - name: Checkout source
+        uses: actions/checkout@v4
+
+      - name: Give permission to Maven wrapper
+        run: chmod +x mvnw
+
+      - name: Build Spring Boot
+        run: ./mvnw clean package -DskipTests
+
+      - name: Stop old application
+        run: pkill -f "java -jar" || true
+
+      - name: Start new version
+        run: |
+          nohup java -jar target/*.jar > app.log 2>&1 &
