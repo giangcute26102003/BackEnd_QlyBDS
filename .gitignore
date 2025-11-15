@@ -38,3 +38,9 @@ build/
 ### Firebase ###
 **/datn-2ea3f-firebase-adminsdk-fbsvc-ac9cbda277.json
 google-services.json
+action-runner/
+actions-runner/
+actions-runner/*
+actions-runner/_diag/
+actions-runner/.credentials*
+actions-runner/.env
