@@ -25,6 +25,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -243,8 +244,51 @@ public class UserManagementController {
     // ==================== ROLE ASSIGNMENT OPERATIONS ====================
 
     /**
-     * Gán roles cho user với phân quyền hierarchy
+     * Update (replace) all roles for a user with business validation
+     * 
+     * Business Rules:
+     * 1. Cannot assign ADMIN role
+     * 2. If department already has a manager, cannot assign MANAGER role
+     * 3. User cannot be both PROPERTY_OWNER and REVIEWER at the same time
      */
+    @PutMapping("/users/{userId}/roles")
+    @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
+    @Auditable(action = "UPDATE_USER_ROLES", entityType = "UserRole", entityIdParam = "userId", logParams = true)
+    public ResponseEntity<?> updateUserRoles(
+            @PathVariable Integer userId,
+            @RequestBody Set<Integer> roleIds) {
+        
+        try {
+            log.info("Updating roles for user ID: {} with roles: {}", userId, roleIds);
+
+            // Check if current user can assign these roles to target user
+            if (!roleHierarchyService.canAssignRoles(userId, roleIds)) {
+                log.warn("Current user does not have permission to assign roles {} to user ID: {}", roleIds, userId);
+                return ResponseEntity.status(HttpStatus.FORBIDDEN)
+                        .body("You do not have permission to assign these roles to this user");
+            }
+
+            // Update roles with validation
+            UserResponse updatedUser = userService.updateUserRoles(userId, roleIds);
+
+            log.info("Successfully updated roles for user ID: {}", userId);
+            return ResponseEntity.ok(updatedUser);
+
+        } catch (BadCredentialsException e) {
+            log.error("Business validation error updating roles for user ID: {}", userId, e);
+            return ResponseEntity.status(HttpStatus.BAD_REQUEST)
+                    .body(e.getMessage());
+        } catch (Exception e) {
+            log.error("Error updating roles for user ID: {}", userId, e);
+            throw e;
+        }
+    }
+
+    /**
+     * Gán roles cho user với phân quyền hierarchy (deprecated - use PUT instead)
+     * @deprecated Use updateUserRoles (PUT) instead
+     */
+    @Deprecated
     @PostMapping("/users/{userId}/roles")
     @PreAuthorize("hasRole('ADMIN') or hasRole('MANAGER')")
     @Auditable(action = "ASSIGN_USER_ROLES", entityType = "UserRole", entityIdParam = "userId", logParams = true)

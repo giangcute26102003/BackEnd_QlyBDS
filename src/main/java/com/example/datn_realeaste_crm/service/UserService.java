@@ -383,6 +383,105 @@ public class UserService {
         return convertToUserResponse(user);
     }
 
+    /**
+     * Update all roles for a user with business validation
+     */
+    @Transactional
+    public UserResponse updateUserRoles(Integer userId, Set<Integer> roleIds) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("User not found with id: " + userId));
+
+        // Validate roleIds exist
+        List<Role> roles = roleRepository.findAllById(roleIds);
+        if (roles.size() != roleIds.size()) {
+            throw new ResourceNotFoundException("One or more roles not found");
+        }
+
+        // Get role names for validation
+        Set<String> roleNames = roles.stream()
+                .map(Role::getRoleName)
+                .collect(Collectors.toSet());
+
+        // Validation 1: Không cho phép gán quyền ADMIN
+        if (roleNames.contains("ADMIN")) {
+            throw new BadCredentialsException("Cannot assign ADMIN role");
+        }
+
+        // Validation 2: Nếu department đã có manager, không được gán manager thêm nữa
+        if (roleNames.contains("MANAGER")) {
+            if (user.getDepartment() != null) {
+                // Check if department already has a different manager
+                List<UserRole> existingManagers = userRoleRepository.findByRoleRoleId(
+                        roleRepository.findByRoleName("MANAGER")
+                                .orElseThrow(() -> new ResourceNotFoundException("MANAGER role not found"))
+                                .getRoleId()
+                );
+
+                User finalUser = user;
+                boolean departmentHasManager = existingManagers.stream()
+                        .filter(ur -> !ur.getUser().getUserId().equals(userId)) // Exclude current user
+                        .anyMatch(ur -> ur.getUser().getDepartment() != null &&
+                                ur.getUser().getDepartment().getDepartmentId()
+                                        .equals(finalUser.getDepartment().getDepartmentId()));
+
+                if (departmentHasManager) {
+                    throw new BadCredentialsException(
+                            "Department already has a manager. Cannot assign MANAGER role to this user.");
+                }
+            }
+        }
+
+        // Validation 3: User không được vừa là PROPERTY_OWNER vừa là REVIEWER
+        if (roleNames.contains("PROPERTY_OWNER") && roleNames.contains("REVIEWER")) {
+            throw new BadCredentialsException(
+                    "User cannot be both PROPERTY_OWNER and REVIEWER at the same time");
+        }
+
+        // Get existing roles
+        List<UserRole> existingUserRoles = userRoleRepository.findByUserUserId(userId);
+        Set<Integer> existingRoleIds = existingUserRoles.stream()
+                .map(ur -> ur.getRole().getRoleId())
+                .collect(Collectors.toSet());
+
+        // Find roles to remove (roles that exist but not in new list)
+        List<UserRole> rolesToRemove = existingUserRoles.stream()
+                .filter(ur -> !roleIds.contains(ur.getRole().getRoleId()))
+                .collect(Collectors.toList());
+
+        // Find roles to add (roles in new list but don't exist)
+        Set<Integer> rolesToAdd = roleIds.stream()
+                .filter(roleId -> !existingRoleIds.contains(roleId))
+                .collect(Collectors.toSet());
+
+        // Remove roles that are no longer needed
+        if (!rolesToRemove.isEmpty()) {
+            userRoleRepository.deleteAll(rolesToRemove);
+            log.info("Removed {} roles from user {}", rolesToRemove.size(), userId);
+        }
+
+        // Add new roles
+        for (Integer roleId : rolesToAdd) {
+            Role role = roles.stream()
+                    .filter(r -> r.getRoleId().equals(roleId))
+                    .findFirst()
+                    .orElseThrow();
+
+            UserRole userRole = new UserRole();
+            userRole.setUser(user);
+            userRole.setRole(role);
+            userRole.setAssignedAt(LocalDateTime.now());
+            userRoleRepository.save(userRole);
+            log.info("Added role {} to user {}", role.getRoleName(), userId);
+        }
+
+        // Roles that already exist are kept as-is (no update needed)
+        log.info("User {} now has {} roles total", userId, roleIds.size());
+
+        // Refresh user to get updated roles
+        user = userRepository.findById(userId).orElseThrow();
+        return convertToUserResponse(user);
+    }
+
     @Transactional
     public UserResponse removeRole(Integer userId, Integer roleId) {
         User user = userRepository.findById(userId)

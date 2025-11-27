@@ -42,38 +42,41 @@ public class AuthService {
         SecurityContextHolder.getContext().setAuthentication(authentication);
         User user = (User) authentication.getPrincipal();
 
-        // 2. Xác định role sẽ sử dụng
-        String roleToUse;
-        if (loginRequest.getSelectedRole() != null && !loginRequest.getSelectedRole().trim().isEmpty()) {
-            // Nếu có truyền selectedRole, kiểm tra xem user có role đó không
-            Optional<UserRole> userRole = userRoleRepository.findByUserUserIdAndRoleRoleId(
-                    user.getUserId(), getRoleIdByName(loginRequest.getSelectedRole()));
-            
-            if (userRole.isEmpty()) {
-                throw new BadCredentialsException("User does not have the selected role: " + loginRequest.getSelectedRole());
-            }
-            roleToUse = loginRequest.getSelectedRole();
-        } else {
-            // Nếu không truyền selectedRole, tự động chọn role đầu tiên của user
-            roleToUse = userRoleRepository.findByUserUserId(user.getUserId())
-                    .stream()
-                    .findFirst()
-                    .map(ur -> ur.getRole().getRoleName())
-                    .orElseThrow(() -> new BadCredentialsException("User does not have any role assigned"));
+        // 2. Lấy tất cả các role của user
+        Set<String> allRoles = userRoleRepository.findByUserUserId(user.getUserId())
+                .stream()
+                .map(ur -> ur.getRole().getRoleName())
+                .collect(Collectors.toSet());
+
+        if (allRoles.isEmpty()) {
+            throw new BadCredentialsException("User does not have any role assigned");
         }
 
-        // 3. Truy xuất danh sách permission tương ứng với role
-        Set<String> permissions = getPermissionsByRole(roleToUse);
+        // 3. Xác định selectedRole để hiển thị (nếu có)
+        String selectedRole;
+        if (loginRequest.getSelectedRole() != null && !loginRequest.getSelectedRole().trim().isEmpty()) {
+            // Nếu có truyền selectedRole, kiểm tra xem user có role đó không
+            if (!allRoles.contains(loginRequest.getSelectedRole())) {
+                throw new BadCredentialsException("User does not have the selected role: " + loginRequest.getSelectedRole());
+            }
+            selectedRole = loginRequest.getSelectedRole();
+        } else {
+            // Nếu không truyền selectedRole, chọn role đầu tiên
+            selectedRole = allRoles.stream().findFirst().orElse(null);
+        }
 
-        // 4. Sinh JWT token chứa username, role và permissions
-        String accessToken = tokenProvider.generateAccessToken(user.getEmail(), roleToUse, permissions);
-        String refreshToken = tokenProvider.generateRefreshToken(user, roleToUse);
+        // 4. Truy xuất tất cả permissions từ tất cả các role
+        Set<String> allPermissions = getAllPermissionsFromRoles(allRoles);
+
+        // 5. Sinh JWT token chứa username, tất cả roles và permissions
+        String accessToken = tokenProvider.generateAccessToken(user.getEmail(), allRoles, allPermissions);
+        String refreshToken = tokenProvider.generateRefreshToken(user, allRoles);
 
         return AuthResponse.builder()
                 .userId(user.getUserId())
                 .email(user.getEmail())
                 .name(user.getName())
-                .selectedRole(roleToUse)
+                .roles(allRoles)
                 .accessToken(accessToken)
                 .refreshToken(refreshToken)
                 .build();
@@ -104,13 +107,23 @@ public class AuthService {
                 .collect(Collectors.toSet());
     }
 
+    /**
+     * Lấy tất cả permissions từ tất cả các role
+     */
+    private Set<String> getAllPermissionsFromRoles(Set<String> roleNames) {
+        return roleNames.stream()
+                .map(this::getPermissionsByRole)
+                .flatMap(Set::stream)
+                .collect(Collectors.toSet());
+    }
+
     public AuthResponse refreshToken(String refreshToken) {
         if (!tokenProvider.validateToken(refreshToken) || !tokenProvider.isRefreshToken(refreshToken)) {
             throw new InvalidTokenException("Invalid refresh token");
         }
         
         String username = tokenProvider.getUsernameFromToken(refreshToken);
-        String role = tokenProvider.getRoleFromToken(refreshToken);
+        Set<String> tokenRoles = tokenProvider.getRolesFromToken(refreshToken);
 
         UserDetails userDetails;
         try {
@@ -121,25 +134,33 @@ public class AuthService {
 
         User user = (User) userDetails;
         
-        // Kiểm tra lại xem user vẫn có role này không
-        Optional<UserRole> userRole = userRoleRepository.findByUserUserIdAndRoleRoleId(
-                user.getUserId(), getRoleIdByName(role));
+        // Lấy tất cả role hiện tại của user từ database
+        Set<String> currentRoles = userRoleRepository.findByUserUserId(user.getUserId())
+                .stream()
+                .map(ur -> ur.getRole().getRoleName())
+                .collect(Collectors.toSet());
         
-        if (userRole.isEmpty()) {
-            throw new InvalidTokenException("User no longer has the role: " + role);
+        if (currentRoles.isEmpty()) {
+            throw new InvalidTokenException("User no longer has any roles assigned");
         }
 
-        // Lấy permissions mới nhất cho role
-        Set<String> permissions = getPermissionsByRole(role);
+        // Lấy tất cả permissions từ tất cả các role hiện tại
+        Set<String> allPermissions = getAllPermissionsFromRoles(currentRoles);
 
-        // Create new access token with role and permissions
-        String newAccessToken = tokenProvider.generateAccessToken(username, role, permissions);
+        // Create new access token with all current roles and permissions
+        String newAccessToken = tokenProvider.generateAccessToken(username, currentRoles, allPermissions);
+
+        // Xác định selectedRole (ưu tiên role đầu tiên trong token cũ nếu vẫn tồn tại)
+        String selectedRole = tokenRoles.stream()
+                .filter(currentRoles::contains)
+                .findFirst()
+                .orElse(currentRoles.stream().findFirst().orElse(null));
 
         return AuthResponse.builder()
                 .userId(user.getUserId())
                 .email(user.getEmail())
                 .name(user.getName())
-                .selectedRole(role)
+                .roles(currentRoles)
                 .accessToken(newAccessToken)
                 .refreshToken(refreshToken)
                 .build();

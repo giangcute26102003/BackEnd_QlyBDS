@@ -66,18 +66,18 @@ public class JwtTokenProvider {
     }
 
     /**
-     * Generate access token with role and permissions
+     * Generate access token with all roles and permissions
      * @param username email của user
-     * @param role vai trò được chọn
-     * @param permissions danh sách quyền tương ứng với role
+     * @param roles danh sách tất cả các role của user
+     * @param permissions danh sách quyền tương ứng với các role
      * @return JWT access token
      */
-    public String generateAccessToken(String username, String role, Set<String> permissions) {
+    public String generateAccessToken(String username, Set<String> roles, Set<String> permissions) {
         if (username == null || username.trim().isEmpty()) {
             throw new IllegalArgumentException("Username cannot be null or empty");
         }
-        if (role == null || role.trim().isEmpty()) {
-            throw new IllegalArgumentException("Role cannot be null or empty");
+        if (roles == null || roles.isEmpty()) {
+            throw new IllegalArgumentException("Roles cannot be null or empty");
         }
         if (permissions == null) {
             permissions = Collections.emptySet();
@@ -89,7 +89,7 @@ public class JwtTokenProvider {
         try {
             return Jwts.builder()
                     .setSubject(username)
-                    .claim("role", role)
+                    .claim("roles", new ArrayList<>(roles)) // Store all roles as a list
                     .claim("permissions", new ArrayList<>(permissions)) // Convert to List for consistent serialization
                     .claim("type", "access")
                     .setIssuedAt(now)
@@ -103,17 +103,17 @@ public class JwtTokenProvider {
     }
 
     /**
-     * Generate refresh token with role information
+     * Generate refresh token with all roles information
      * @param user User entity
-     * @param role selected role
+     * @param roles all user roles
      * @return JWT refresh token
      */
-    public String generateRefreshToken(User user, String role) {
+    public String generateRefreshToken(User user, Set<String> roles) {
         if (user == null || user.getEmail() == null) {
             throw new IllegalArgumentException("User and user email cannot be null");
         }
-        if (role == null || role.trim().isEmpty()) {
-            throw new IllegalArgumentException("Role cannot be null or empty");
+        if (roles == null || roles.isEmpty()) {
+            throw new IllegalArgumentException("Roles cannot be null or empty");
         }
 
         Date now = new Date();
@@ -122,7 +122,7 @@ public class JwtTokenProvider {
         try {
             String refreshToken = Jwts.builder()
                     .setSubject(user.getEmail())
-                    .claim("role", role)
+                    .claim("roles", new ArrayList<>(roles))
                     .claim("type", "refresh")
                     .setIssuedAt(now)
                     .setExpiration(validity)
@@ -139,22 +139,42 @@ public class JwtTokenProvider {
     }
 
     /**
-     * Extract role from JWT token
+     * Extract roles from JWT token
      * @param token JWT token
-     * @return role name
+     * @return set of role names
      */
-    public String getRoleFromToken(String token) {
+    @SuppressWarnings("unchecked")
+    public Set<String> getRolesFromToken(String token) {
         if (token == null || token.trim().isEmpty()) {
             throw new IllegalArgumentException("Token cannot be null or empty");
         }
 
         try {
             Claims claims = parseToken(token);
-            return claims.get("role", String.class);
+            Object rolesClaim = claims.get("roles");
+            
+            if (rolesClaim instanceof List) {
+                List<String> rolesList = (List<String>) rolesClaim;
+                return new HashSet<>(rolesList);
+            }
+            
+            return Collections.emptySet();
         } catch (Exception e) {
-            log.error("Failed to extract role from token", e);
-            throw new RuntimeException("Failed to extract role from token", e);
+            log.error("Failed to extract roles from token", e);
+            throw new RuntimeException("Failed to extract roles from token", e);
         }
+    }
+
+    /**
+     * Extract role from JWT token (for backward compatibility - returns first role)
+     * @param token JWT token
+     * @return role name
+     * @deprecated Use getRolesFromToken instead
+     */
+    @Deprecated
+    public String getRoleFromToken(String token) {
+        Set<String> roles = getRolesFromToken(token);
+        return roles.stream().findFirst().orElse(null);
     }
 
     /**
@@ -330,10 +350,16 @@ public class JwtTokenProvider {
     private Collection<GrantedAuthority> extractAuthorities(Claims claims) {
         Set<GrantedAuthority> authorities = new HashSet<>();
 
-        // Add role as authority with ROLE_ prefix
-        String role = claims.get("role", String.class);
-        if (role != null && !role.trim().isEmpty()) {
-            authorities.add(new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()));
+        // Add roles as authorities with ROLE_ prefix
+        Object rolesClaim = claims.get("roles");
+        if (rolesClaim instanceof List) {
+            @SuppressWarnings("unchecked")
+            List<String> roles = (List<String>) rolesClaim;
+            roles.stream()
+                    .filter(Objects::nonNull)
+                    .filter(role -> !role.trim().isEmpty())
+                    .map(role -> new SimpleGrantedAuthority("ROLE_" + role.toUpperCase()))
+                    .forEach(authorities::add);
         }
 
         // Add permissions as authorities
