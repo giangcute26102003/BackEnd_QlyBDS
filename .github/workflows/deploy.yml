@@ -1,26 +1,84 @@
-name: Deploy Spring Boot
+name: Deploy Spring Boot with Docker
 
 on:
   push:
     branches: [ "test-deploy" ]
 
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository }}
+  CONTAINER_NAME: backend-qlybds
+
 jobs:
-  build:
+  build-and-deploy:
     runs-on: self-hosted
+    permissions:
+      contents: read
+      packages: write
 
     steps:
-      - name: Checkout source
+      - name: Checkout source code
         uses: actions/checkout@v4
 
-      - name: Give permission to Maven wrapper
-        run: chmod +x mvnw
-
-      - name: Build Spring Boot
-        run: ./mvnw clean package -DskipTests
-
-      - name: Stop old application
-        run: pkill -f "java -jar" || true
-
-      - name: Start new version
+      - name: Verify Docker is available
         run: |
-          nohup java -jar target/*.jar > app.log 2>&1 &
+          docker --version
+          docker ps
+          echo "✓ Docker is available on runner"
+
+      - name: Set image name and tag
+        id: image
+        run: |
+          IMAGE_TAG="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${{ github.sha }}"
+          echo "tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+          echo "Using image: ${IMAGE_TAG}"
+
+      - name: Build Docker image
+        run: |
+          docker build -t ${{ steps.image.outputs.tag }} -t ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest .
+          echo "✓ Docker image built successfully"
+
+      - name: Remove old container and cleanup
+        run: |
+          CONTAINER_NAME="${{ env.CONTAINER_NAME }}"
+          if docker ps -a --format='{{.Names}}' | grep -q "^${CONTAINER_NAME}$"; then
+            echo "Stopping container: $CONTAINER_NAME"
+            docker stop $CONTAINER_NAME || true
+            docker rm $CONTAINER_NAME || true
+          fi
+          # Optional: prune dangling images
+          docker image prune -f || true
+          echo "✓ Old container removed"
+
+      - name: Start new container
+        run: |
+          docker run -d \
+            --name ${{ env.CONTAINER_NAME }} \
+            -p 8080:8080 \
+            --restart unless-stopped \
+            --log-driver json-file \
+            --log-opt max-size=10m \
+            --log-opt max-file=3 \
+            ${{ steps.image.outputs.tag }}
+          echo "✓ New container started"
+
+      - name: Verify container is running
+        run: |
+          sleep 5
+          if docker ps --format='{{.Names}}' | grep -q "^${{ env.CONTAINER_NAME }}$"; then
+            echo "✓ Container is running"
+            docker ps --filter name=${{ env.CONTAINER_NAME }}
+          else
+            echo "✗ Container failed to start"
+            docker logs ${{ env.CONTAINER_NAME }}
+            exit 1
+          fi
+
+      - name: Push to registry (optional)
+        # Uncomment and configure secrets to enable pushing to GHCR/Docker Hub
+        # run: |
+        #   echo "${{ secrets.GITHUB_TOKEN }}" | docker login ${{ env.REGISTRY }} -u ${{ github.actor }} --password-stdin
+        #   docker push ${{ steps.image.outputs.tag }}
+        #   docker push ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:latest
+        run: |
+          echo "Container deployment complete. Pushing to registry can be enabled in workflow."
