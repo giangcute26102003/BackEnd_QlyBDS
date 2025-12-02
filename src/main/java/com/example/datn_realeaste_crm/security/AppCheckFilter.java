@@ -28,7 +28,7 @@ public class AppCheckFilter extends OncePerRequestFilter {
     
     private final AppCheckVerificationService verificationService;
     
-    // Danh sách các endpoint không cần App Check (public endpoints)
+    // List các endpoint không cần App Check (public endpoints)
     private static final List<String> EXCLUDED_PATHS = Arrays.asList(
             "/api/health",
             "/api/public",
@@ -101,7 +101,7 @@ public class AppCheckFilter extends OncePerRequestFilter {
             logger.debug("Skipping App Check for public endpoint: {}", path);
         }
         
-        return shouldSkip;
+        return !shouldSkip;
     }
 
     /**
