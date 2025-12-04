@@ -1,0 +1,18 @@
+# Simple Dockerfile for CI/CD - assumes JAR is already built
+FROM eclipse-temurin:17-jre-jammy
+
+WORKDIR /app
+
+# Copy the pre-built JAR file
+COPY target/*.jar app.jar
+
+# Expose port
+EXPOSE 8088
+
+# Health check
+HEALTHCHECK --interval=30s --timeout=3s --start-period=10s --retries=3 \
+  CMD wget --quiet --tries=1 --spider http://localhost:8080/actuator/health || exit 1
+
+# Run the application
+ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+
