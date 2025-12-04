@@ -71,7 +71,7 @@ jobs:
         run: |
           docker run -d \
             --name ${{ env.CONTAINER_NAME }} \
-            -p 8088:8088 \
+            --network host \
             --restart unless-stopped \
             --log-driver json-file \
             --log-opt max-size=10m \
@@ -87,7 +87,7 @@ jobs:
             -e AWS_REGION="${{ secrets.AWS_REGION }}" \
             -e AWS_S3_BUCKET_NAME="${{ secrets.AWS_S3_BUCKET_NAME }}" \
             ${{ steps.image.outputs.tag }}
-          echo "✓ New container started with environment variables"
+          echo "✓ New container started with host network mode"
 
       - name: Verify container is running
         run: |
