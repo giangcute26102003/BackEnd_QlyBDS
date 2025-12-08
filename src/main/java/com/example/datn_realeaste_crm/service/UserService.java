@@ -268,6 +268,7 @@ public class UserService {
                         .orElseThrow(() -> new ResourceNotFoundException("Role not found with id: " + roleId));
 
                 UserRole userRole = new UserRole();
+                userRole.setId(new UserRoleId(savedUser.getUserId(), role.getRoleId()));
                 userRole.setUser(savedUser);
                 userRole.setRole(role);
                 userRole.setAssignedAt(LocalDateTime.now());
@@ -373,6 +374,7 @@ public class UserService {
 
         if (existingRole.isEmpty()) {
             UserRole userRole = new UserRole();
+            userRole.setId(new UserRoleId(user.getUserId(), role.getRoleId()));
             userRole.setUser(user);
             userRole.setRole(role);
             userRole.setAssignedAt(LocalDateTime.now());
@@ -455,7 +457,12 @@ public class UserService {
 
         // Remove roles that are no longer needed
         if (!rolesToRemove.isEmpty()) {
-            userRoleRepository.deleteAll(rolesToRemove);
+            // Quan trọng: Phải remove khỏi Set của User trước để tránh CascadeType.ALL tự động insert lại
+            user.getUserRoles().removeAll(rolesToRemove);
+            
+            for (UserRole ur : rolesToRemove) {
+                userRoleRepository.delete(ur);
+            }
             log.info("Removed {} roles from user {}", rolesToRemove.size(), userId);
         }
 
@@ -467,6 +474,7 @@ public class UserService {
                     .orElseThrow();
 
             UserRole userRole = new UserRole();
+            userRole.setId(new UserRoleId(user.getUserId(), role.getRoleId()));
             userRole.setUser(user);
             userRole.setRole(role);
             userRole.setAssignedAt(LocalDateTime.now());

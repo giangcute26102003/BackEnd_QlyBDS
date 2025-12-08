@@ -14,16 +14,16 @@ import java.time.LocalDateTime;
 @Builder
 public class UserRole {
     
-    @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "id")
-    private Integer id;
+    @EmbeddedId
+    private UserRoleId id;
     
     @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("roleId")
     @JoinColumn(name = "role_id", nullable = false)
     private Role role;
     
     @ManyToOne(fetch = FetchType.LAZY)
+    @MapsId("userId")
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
     
