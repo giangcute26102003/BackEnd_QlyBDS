@@ -635,22 +635,44 @@ public class PropertyService {
                 .collect(Collectors.groupingBy(p -> p.getDepartment().getName(), Collectors.counting()));
         
         // Price statistics
-        OptionalDouble avgPrice = allProperties.stream().mapToDouble(p -> p.getPrice().doubleValue()).average();
-        Optional<BigDecimal> minPrice = allProperties.stream().map(Property::getPrice).min(BigDecimal::compareTo);
-        Optional<BigDecimal> maxPrice = allProperties.stream().map(Property::getPrice).max(BigDecimal::compareTo);
-        BigDecimal totalValue = allProperties.stream().map(Property::getPrice).reduce(BigDecimal.ZERO, BigDecimal::add);
+        OptionalDouble avgPrice = allProperties.stream()
+                .filter(p -> p.getPrice() != null)
+                .mapToDouble(p -> p.getPrice().doubleValue())
+                .average();
+        Optional<BigDecimal> minPrice = allProperties.stream()
+                .map(Property::getPrice)
+                .filter(Objects::nonNull)
+                .min(BigDecimal::compareTo);
+        Optional<BigDecimal> maxPrice = allProperties.stream()
+                .map(Property::getPrice)
+                .filter(Objects::nonNull)
+                .max(BigDecimal::compareTo);
+        BigDecimal totalValue = allProperties.stream()
+                .map(Property::getPrice)
+                .filter(Objects::nonNull)
+                .reduce(BigDecimal.ZERO, BigDecimal::add);
         
         // Size and room statistics
-        OptionalDouble avgSize = allProperties.stream().mapToDouble(p -> p.getSize().doubleValue()).average();
-        OptionalDouble avgBedrooms = allProperties.stream().mapToInt(Property::getBedrooms).average();
-        OptionalDouble avgBathrooms = allProperties.stream().mapToInt(Property::getBathrooms).average();
+        OptionalDouble avgSize = allProperties.stream()
+                .filter(p -> p.getSize() != null)
+                .mapToDouble(p -> p.getSize().doubleValue())
+                .average();
+        OptionalDouble avgBedrooms = allProperties.stream()
+                .filter(p -> p.getBedrooms() != null)
+                .mapToInt(Property::getBedrooms)
+                .average();
+        OptionalDouble avgBathrooms = allProperties.stream()
+                .filter(p -> p.getBathrooms() != null)
+                .mapToInt(Property::getBathrooms)
+                .average();
         
         // Growth metrics (simplified - would need more complex date filtering in real implementation)
         long propertiesThisMonth = allProperties.stream()
-                .filter(p -> p.getCreatedAt().isAfter(LocalDateTime.now().minusMonths(1)))
+                .filter(p -> p.getCreatedAt() != null && p.getCreatedAt().isAfter(LocalDateTime.now().minusMonths(1)))
                 .count();
         long propertiesLastMonth = allProperties.stream()
-                .filter(p -> p.getCreatedAt().isAfter(LocalDateTime.now().minusMonths(2)) && 
+                .filter(p -> p.getCreatedAt() != null && 
+                            p.getCreatedAt().isAfter(LocalDateTime.now().minusMonths(2)) && 
                             p.getCreatedAt().isBefore(LocalDateTime.now().minusMonths(1)))
                 .count();
         
