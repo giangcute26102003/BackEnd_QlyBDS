@@ -326,6 +326,9 @@ public class PropertyService {
 
         // Set availability from request or default to PENDING for new properties
         if (request.getAvailability() != null) {
+            // Owner can only update status to DEPOSITED if current status is AVAILABLE
+            // Other status changes by owner are ignored here (and reset to PENDING later if content changed)
+            // or handled by specific business logic in calling methods
             property.setAvailability(request.getAvailability());
         } else if (property.getAvailability() == null) {
             property.setAvailability(AvailabilityStatus.PENDING);
@@ -492,7 +495,38 @@ public class PropertyService {
         Property property = propertyRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Property not found with id: " + id));
 
+        User currentUser = getCurrentUser();
+        if (currentUser == null) {
+            throw new IllegalStateException("User must be authenticated");
+        }
+
+        // Check if current user is the property owner
+        boolean isOwner = property.getUser() != null && 
+                          property.getUser().getUserId().equals(currentUser.getUserId());
+
+        // Get old status first
         AvailabilityStatus oldStatus = property.getAvailability();
+
+        // Validate status transition based on user role
+        // Check if user has ADMIN or MANAGER role (these roles have full control)
+        boolean isAdminOrManager = currentUser.getUserRoles().stream()
+                .anyMatch(ur -> ur.getRole().getRoleName().equals("ADMIN") || 
+                               ur.getRole().getRoleName().equals("MANAGER"));
+        
+        // If user is NOT Admin/Manager but IS the property owner
+        // → Owner can ONLY update status from AVAILABLE to DEPOSITED or SOLD
+        if (!isAdminOrManager && isOwner) {
+            if (oldStatus != AvailabilityStatus.AVAILABLE || 
+                (status != AvailabilityStatus.DEPOSITED && status != AvailabilityStatus.SOLD)) {
+                throw new AccessDeniedException(
+                    "Property owner can only update status from AVAILABLE to DEPOSITED or SOLD. " +
+                    "Current status: " + (oldStatus != null ? oldStatus.name() : "null") + 
+                    ", Requested status: " + status.name());
+            }
+        }
+        // If user is Admin/Manager → no restriction (can update any status)
+        // If user is NOT owner and NOT Admin/Manager → will be blocked by @PreAuthorize at Controller level
+
         property.setAvailability(status);
         
         if (reason != null && !reason.trim().isEmpty()) {
@@ -1181,15 +1215,44 @@ public class PropertyService {
         //     }
         // }
         
-        // if (!isOwner) {
-        //     throw new AccessDeniedException("You can only update your own properties");
-        // }
+        if (!isOwner) {
+            throw new AccessDeniedException("You can only update your own properties");
+        }
+
+        // Validate status update by owner
+        // Owner can ONLY update status from AVAILABLE to DEPOSITED or SOLD
+        // All other status changes are restricted (reserved for Reviewer/Admin)
+        boolean isValidStatusUpdate = false;
+        if (propertyRequest.getAvailability() != null) {
+            AvailabilityStatus currentStatus = property.getAvailability();
+            AvailabilityStatus requestedStatus = propertyRequest.getAvailability();
+            
+            // Only allow AVAILABLE -> DEPOSITED or AVAILABLE -> SOLD transitions
+            if (currentStatus == AvailabilityStatus.AVAILABLE && 
+                (requestedStatus == AvailabilityStatus.DEPOSITED || 
+                 requestedStatus == AvailabilityStatus.SOLD)) {
+                isValidStatusUpdate = true;
+            } else {
+                // Invalid status change attempt by owner - ignore the status update
+                // This prevents owner from self-approving (PENDING -> AVAILABLE)
+                // or changing to NOT_AVAILABLE, etc.
+                // log.warn("Owner attempted invalid status change from {} to {} - ignoring status field", 
+                //          currentStatus, requestedStatus);
+                propertyRequest.setAvailability(null); // Nullify to prevent update
+            }
+        }
 
         // Update property fields from request
         updatePropertyFromRequest(property, propertyRequest);
         
-        // IMPORTANT: Reset status to PENDING after owner updates
-        property.setAvailability(AvailabilityStatus.PENDING);
+        // IMPORTANT: Reset status to PENDING after owner updates content, 
+        // unless it's a valid deposit status update
+        if (!isValidStatusUpdate) {
+            // Content changed -> reset to PENDING for re-review
+            property.setAvailability(AvailabilityStatus.PENDING);
+        }
+        // else: Keep the DEPOSITED status from the request (already set in updatePropertyFromRequest)
+        
         property.setUpdatedAt(LocalDateTime.now());
 
         Property updatedProperty = propertyRepository.save(property);

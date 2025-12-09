@@ -210,13 +210,19 @@ public class PropertyController {
     @PatchMapping("/{id}/status")
     @PreAuthorize("hasRole('ADMIN') or " +
             "(hasRole('MANAGER') and @propertyAuthorizationService.isPropertyInUserDepartment(#id)) or " +
-            "(hasRole('PROPERTY_OWNER') and @propertyAuthorizationService.isPropertyOwner(#id))")
+            "(hasRole('PROPERTY_OWNER') or @propertyAuthorizationService.isPropertyOwner(#id))")
     @Auditable(action = "UPDATE_PROPERTY_STATUS", entityType = "Property", entityIdParam = "id", logParams = true)
     public ResponseEntity<PropertyResponse> updatePropertyStatus(
             @PathVariable Integer id, 
-            @RequestParam Integer status,
+            @RequestParam(required = false) Integer status,
+            @RequestParam(required = false) Integer availability,
             @RequestParam(required = false) String reason) {
-        AvailabilityStatus availabilityStatus = AvailabilityStatus.fromCode(status);
+        // Support both 'status' and 'availability' param names for backward compatibility
+        Integer statusCode = status != null ? status : availability;
+        if (statusCode == null) {
+            throw new IllegalArgumentException("Either 'status' or 'availability' parameter is required");
+        }
+        AvailabilityStatus availabilityStatus = AvailabilityStatus.fromCode(statusCode);
         return ResponseEntity.ok(propertyService.updatePropertyStatus(id, availabilityStatus, reason));
     }
 
