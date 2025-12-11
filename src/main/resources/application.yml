@@ -1,0 +1,77 @@
+spring:
+  datasource:
+    url: ${SPRING_DATASOURCE_URL}
+    username: ${SPRING_DATASOURCE_USERNAME}
+    password: ${SPRING_DATASOURCE_PASSWORD}
+    driver-class-name: com.mysql.cj.jdbc.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: none
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.MySQLDialect
+        format_sql: true
+    show-sql: true
+
+  jackson:
+    serialization:
+      WRITE_DATES_AS_TIMESTAMPS: false
+
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 50MB
+      enabled: true
+
+# ================= JWT =================
+jwt:
+  secret: ${JWT_SECRET}
+  access-token-expiration: 3600000
+  refresh-token-expiration: 86400000
+
+# ================= ENCRYPTION =================
+encryption:
+  master-key: ${ENCRYPTION_MASTER_KEY_BASE64}
+  hash-key: ${ENCRYPTION_HASH_KEY_BASE64}
+
+# ================= AWS S3 =================
+aws:
+  s3:
+    access-key: ${AWS_ACCESS_KEY_ID}
+    secret-key: ${AWS_SECRET_ACCESS_KEY}
+    region: ${AWS_REGION}
+    bucket-name: ${AWS_S3_BUCKET_NAME}
+    base-url: https://${AWS_S3_BUCKET_NAME}.s3.${AWS_REGION}.amazonaws.com/
+
+# ================= LOGGING =================
+logging:
+  level:
+    root: info
+    org.springframework: INFO
+    org.hibernate.SQL: DEBUG
+    org.hibernate.type.descriptor.sql.BasicBinder: TRACE
+
+# ================= SERVER =================
+server:
+  port: 8080
+  servlet:
+    context-path: /api
+  address: 0.0.0.0
+
+# ================= SWAGGER =================
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+    enabled: true
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+    try-it-out-enabled: true
+    operations-sorter: method
+    tags-sorter: alpha
+    filter: true
+    display-request-duration: true
+    disable-swagger-default-url: true
+  packages-to-scan: com.example.datn_realeaste_crm.controller
+  paths-to-match: /**

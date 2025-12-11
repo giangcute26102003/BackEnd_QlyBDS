@@ -19,7 +19,7 @@ target/
 *.iml
 *.ipr
 # Spring configuration
-src/main/resources/application.yml
+src/main/resources/application-offical.yml
 
 
 ### NetBeans ###

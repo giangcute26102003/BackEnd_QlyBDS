@@ -80,8 +80,8 @@ jobs:
             -e SPRING_DATASOURCE_USERNAME="${{ secrets.DB_USERNAME }}" \
             -e SPRING_DATASOURCE_PASSWORD="${{ secrets.DB_PASSWORD }}" \
             -e JWT_SECRET="${{ secrets.JWT_SECRET }}" \
-            -e ENCRYPTION_MASTER_KEY_BASE64="${{ secrets.ENCRYPTION_MASTER_KEY }}" \
-            -e ENCRYPTION_HASH_KEY_BASE64="${{ secrets.ENCRYPTION_HASH_KEY }}" \
+            -e ENCRYPTION_MASTER_KEY_BASE64="${{ secrets.ENCRYPTION_MASTER_KEY_BASE64 }}" \
+            -e ENCRYPTION_HASH_KEY_BASE64="${{ secrets.ENCRYPTION_HASH_KEY_BASE64 }}" \
             -e AWS_ACCESS_KEY_ID="${{ secrets.AWS_ACCESS_KEY_ID }}" \
             -e AWS_SECRET_ACCESS_KEY="${{ secrets.AWS_SECRET_ACCESS_KEY }}" \
             -e AWS_REGION="${{ secrets.AWS_REGION }}" \
@@ -109,3 +109,17 @@ jobs:
         #   docker push ${{ steps.image.outputs.latest }}
         run: |
           echo "Container deployment complete. Pushing to registry can be enabled in workflow."
+
+      - name: Health check
+        run: |
+          echo "Waiting for application to be ready..."
+          sleep 10
+          # Check if container is still running after startup
+          if docker ps --format='{{.Names}}' | grep -q "^${{ env.CONTAINER_NAME }}$"; then
+            echo "✓ Container is healthy"
+            docker logs --tail 20 ${{ env.CONTAINER_NAME }}
+          else
+            echo "✗ Container stopped unexpectedly"
+            docker logs ${{ env.CONTAINER_NAME }}
+            exit 1
+          fi
